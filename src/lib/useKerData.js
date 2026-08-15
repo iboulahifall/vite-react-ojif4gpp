@@ -175,7 +175,7 @@ export function useKerData() {
         // rattacher problèmes/dépenses à leur logement
         adapted.forEach((p) => {
           p.problems = (problems || []).filter((m) => m.units?.property_id === p.id)
-            .map((m) => ({ id: m.id, unitId: m.unit_id, unit: m.units?.label, category: m.category, desc: m.description, status: m.status, by: "—" }));
+            .map((m) => ({ id: m.id, unitId: m.unit_id, unit: m.units?.label, category: m.category, desc: m.description, status: m.status, by: "—", photos: m.photo_urls || (m.photo_url ? [m.photo_url] : []) }));
           p.expenses = (expenses || []).filter((e) => e.property_id === p.id)
             .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—" }));
         });
@@ -252,8 +252,17 @@ export function useKerData() {
       } catch (e) { setError(e.message || "Enregistrement du paiement impossible."); }
     },
     reportProblem: wrap(
-      (unitId, category, description) => tenant.reportProblem(unitId, { category, description }),
+      (unitId, category, description, photoUrls) => tenant.reportProblem(unitId, { category, description, photoUrls }),
       demo.addProblem),
+    // Uploader une photo de problème, renvoie son chemin (réel) ou null (démo)
+    uploadProblemPhoto: async (file) => {
+      if (!REAL) return null;
+      try { return await tenant.uploadProblemPhoto(file); } catch (e) { setError(e.message || "Envoi de la photo impossible."); return null; }
+    },
+    photoUrl: async (path) => {
+      if (!REAL || !path) return null;
+      try { return await tenant.photoUrl(path); } catch (e) { return null; }
+    },
     setProblemStatus: wrap(
       (id, status) => owner.setProblemStatus(id, status),
       demo.setProblemStatus),

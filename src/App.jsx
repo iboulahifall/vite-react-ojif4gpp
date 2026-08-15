@@ -213,7 +213,9 @@ export default function KerApp() {
   const session = sessionState;
 
   const recordPayment = (unitId, rent, leaseId) => ker.recordPayment(unitId, rent, leaseId);
-  const addProblem = (unitId, category, desc) => ker.reportProblem(unitId, category, desc);
+  const addProblem = (unitId, category, desc, photoUrls) => ker.reportProblem(unitId, category, desc, photoUrls);
+  const uploadProblemPhoto = (file) => ker.uploadProblemPhoto(file);
+  const openPhoto = (path) => ker.photoUrl(path);
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
   const addExpense = (propId, label, category, amount, by) => ker.addExpense(propId, label, category, amount, by);
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
@@ -267,7 +269,7 @@ export default function KerApp() {
   if (session.role === "proprietaire" && !db.owner.onboarded)
     return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={handleLogout} />;
   if (session.role === "proprietaire")
-    return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus}
+    return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onOpenPhoto={openPhoto}
       onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} logout={handleLogout} />;
@@ -281,7 +283,7 @@ export default function KerApp() {
   {
     // Unité à afficher pour le locataire : en réel, la première (unique) chargée.
     const tenantUnitId = session.unitId || (db.properties[0] && db.properties[0].units[0] && db.properties[0].units[0].id);
-    return <TenantApp db={db} unitId={tenantUnitId} onRecord={recordPayment} onAddProblem={addProblem} logout={handleLogout} />;
+    return <TenantApp db={db} unitId={tenantUnitId} onRecord={recordPayment} onAddProblem={addProblem} onUploadPhoto={uploadProblemPhoto} logout={handleLogout} />;
   }
 }
 
@@ -393,7 +395,7 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onOpenPhoto, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -411,7 +413,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold,
       {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} onAdd={() => setAddProp(true)} />}
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
-      {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} />}
+      {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
@@ -602,8 +604,13 @@ function Rents({ props, back, onRecord, onReceipt }) {
   );
 }
 
-function Problems({ props, back, onStatus }) {
+function Problems({ props, back, onStatus, onOpenPhoto }) {
   const items = props.flatMap((p) => p.problems.map((m) => ({ ...m, propName: p.name })));
+  const openPhoto = async (path) => {
+    if (!onOpenPhoto) return;
+    const url = await onOpenPhoto(path);
+    if (url) window.open(url, "_blank");
+  };
   return (
     <Screen title="Problemes signales" back={back}>
       <div style={{ display: "grid", gap: 12 }}>
@@ -616,6 +623,15 @@ function Problems({ props, back, onStatus }) {
             </div>
             <div style={{ fontSize: 13, color: T.mut, marginTop: 2 }}>{m.unit} · signale par {m.by}</div>
             <div style={{ fontSize: 14, marginTop: 8 }}>{m.desc}</div>
+            {m.photos && m.photos.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                {m.photos.map((ph, i) => (
+                  <button key={i} onClick={() => openPhoto(ph)} style={{ display: "flex", alignItems: "center", gap: 6, background: T.tealSoft, color: T.teal, border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    <ImageIcon size={14} /> Voir photo {i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
             {m.status !== "resolu" && (
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                 {m.status === "nouveau" && <button onClick={() => onStatus(m.id, "en_cours")} style={{ ...ghostBtn, flex: 1 }}>Prendre en charge</button>}
@@ -853,7 +869,7 @@ function AddExpenseSheet({ props, threshold, by, close, onAdd }) {
 }
 
 /* ===================== LOCATAIRE (§29) ===================== */
-function TenantApp({ db, unitId, onRecord, onAddProblem, logout }) {
+function TenantApp({ db, unitId, onRecord, onAddProblem, onUploadPhoto, logout }) {
   const [screen, setScreen] = useState("home");
   const prop = db.properties.find((p) => p.units.some((u) => u.id === unitId));
   const unit = prop.units.find((u) => u.id === unitId);
@@ -862,7 +878,7 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, logout }) {
   const recent = unit.payments.slice(-3);
 
   if (screen === "report")
-    return <ReportProblem unit={unit} back={() => setScreen("home")} onSubmit={(cat, desc) => { onAddProblem(unitId, cat, desc); setScreen("home"); }} />;
+    return <ReportProblem unit={unit} back={() => setScreen("home")} onUploadPhoto={onUploadPhoto} onSubmit={(cat, desc, photos) => { onAddProblem(unitId, cat, desc, photos); setScreen("home"); }} />;
   if (screen === "receipts")
     return <ReceiptsScreen receipts={db.receipts || []} back={() => setScreen("home")} />;
 
@@ -923,9 +939,37 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, logout }) {
   );
 }
 
-function ReportProblem({ unit, back, onSubmit }) {
+function ReportProblem({ unit, back, onSubmit, onUploadPhoto }) {
   const [cat, setCat] = useState(null);
   const [desc, setDesc] = useState("");
+  const [photos, setPhotos] = useState([]);   // [{ name, path }]
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const addPhoto = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setErr(null);
+    if (file.size > 10 * 1024 * 1024) { setErr("Photo trop lourde (max 10 Mo)."); return; }
+    if (!onUploadPhoto) { setErr("Envoi de photo indisponible."); return; }
+    setUploading(true);
+    try {
+      const path = await onUploadPhoto(file);
+      if (path) setPhotos((p) => [...p, { name: file.name, path }]);
+      else setErr("La photo n'a pas pu être envoyée.");
+    } catch (e2) { setErr("La photo n'a pas pu être envoyée."); }
+    finally { setUploading(false); }
+  };
+
+  const removePhoto = (i) => setPhotos((p) => p.filter((_, idx) => idx !== i));
+
+  const submit = async () => {
+    setSubmitting(true);
+    await onSubmit(cat, desc.trim(), photos.map((p) => p.path));
+  };
+
   return (
     <Shell>
       <Screen title="Signaler un probleme" back={back} sub={unit.label}>
@@ -946,17 +990,28 @@ function ReportProblem({ unit, back, onSubmit }) {
         </div>
         {cat && (
           <div className="fade" style={{ marginTop: 20 }}>
-            <div style={{ fontSize: 13, color: T.mut, marginBottom: 10, fontWeight: 600 }}>2. AJOUTER UNE PHOTO (optionnel)</div>
-            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: T.tealSoft, color: T.teal, border: "2px dashed " + T.teal, borderRadius: 16, padding: 20, cursor: "pointer", fontWeight: 700 }}>
-              <Camera size={20} /> Prendre une photo
-              <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} />
+            <div style={{ fontSize: 13, color: T.mut, marginBottom: 10, fontWeight: 600 }}>2. AJOUTER DES PHOTOS (optionnel)</div>
+            {photos.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                {photos.map((p, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, background: T.tealSoft, color: T.teal, borderRadius: 10, padding: "6px 10px", fontSize: 12.5, fontWeight: 600 }}>
+                    <ImageIcon size={14} /> Photo {i + 1}
+                    <button onClick={() => removePhoto(i)} style={{ border: "none", background: "transparent", cursor: "pointer", color: T.late, display: "flex" }}><X size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: T.tealSoft, color: T.teal, border: "2px dashed " + T.teal, borderRadius: 16, padding: 18, cursor: uploading ? "default" : "pointer", fontWeight: 700, opacity: uploading ? 0.6 : 1 }}>
+              <Camera size={20} /> {uploading ? "Envoi de la photo…" : (photos.length ? "Ajouter une autre photo" : "Prendre / choisir une photo")}
+              <input type="file" accept="image/*" capture="environment" onChange={addPhoto} disabled={uploading} style={{ display: "none" }} />
             </label>
+            {err && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600, marginTop: 10 }}>{err}</div>}
             <div style={{ fontSize: 13, color: T.mut, margin: "20px 0 10px", fontWeight: 600 }}>3. DECRIRE LE PROBLEME</div>
             <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Ex : La climatisation ne fonctionne plus depuis hier."
               style={{ width: "100%", border: "1px solid " + T.line, borderRadius: 14, padding: 14, fontSize: 15, fontFamily: "inherit", resize: "none" }} />
-            <button disabled={!desc.trim()} onClick={() => onSubmit(cat, desc.trim())}
-              style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 14, padding: 15, fontSize: 16, opacity: desc.trim() ? 1 : 0.4 }}>
-              Envoyer le signalement
+            <button disabled={!desc.trim() || submitting || uploading} onClick={submit}
+              style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 14, padding: 15, fontSize: 16, opacity: (desc.trim() && !submitting && !uploading) ? 1 : 0.4 }}>
+              {submitting ? "Envoi…" : "Envoyer le signalement"}
             </button>
           </div>
         )}
