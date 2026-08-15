@@ -221,6 +221,7 @@ export default function KerApp() {
   const updateRepair = (id, patch) => ker.updateRepair(id, patch);
   const addExpense = (propId, label, category, amount, by, extra) => ker.addExpense(propId, label, category, amount, by, extra);
   const uploadExpenseReceipt = (file) => ker.uploadExpenseReceipt(file);
+  const deleteExpense = (propId, id, receiptUrl) => ker.deleteExpense(propId, id, receiptUrl);
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
   const setThreshold = (value) => ker.setThreshold(value);
   const addDocument = (doc) => ker.addDocument(doc);
@@ -273,7 +274,7 @@ export default function KerApp() {
     return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={handleLogout} />;
   if (session.role === "proprietaire")
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onRepair={updateRepair} onOpenPhoto={openPhoto}
-      onExpenseStatus={setExpenseStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} onThreshold={setThreshold} onAddDocument={addDocument}
+      onExpenseStatus={setExpenseStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} onDeleteExpense={deleteExpense} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} logout={handleLogout} />;
   if (session.role === "gestionnaire")
@@ -398,7 +399,7 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onAddExpense, onUploadReceipt, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onAddExpense, onUploadReceipt, onDeleteExpense, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -418,7 +419,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
-      {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} />}
+      {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} onDelete={onDeleteExpense} onOpenReceipt={onOpenDocument} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "profile" && <ProfileScreen owner={db.owner} onSave={onUpdateProfile} back={() => setView({ name: "dashboard" })} />}
       {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
@@ -747,7 +748,7 @@ function RepairSheet({ problem, onRepair, close }) {
 }
 
 /* Depenses cote proprietaire : validation au seuil (§11) */
-function OwnerExpenses({ props, threshold, back, onStatus, go, onAddClick }) {
+function OwnerExpenses({ props, threshold, back, onStatus, go, onAddClick, onDelete, onOpenReceipt }) {
   const items = props.flatMap((p) => p.expenses.map((e) => ({ ...e, propId: p.id, propName: p.name })));
   const pending = items.filter((e) => e.status === "attente_validation");
   const others = items.filter((e) => e.status !== "attente_validation");
@@ -784,11 +785,23 @@ function OwnerExpenses({ props, threshold, back, onStatus, go, onAddClick }) {
         {others.map((e) => (
           <div key={e.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: T.sunSoft, color: T.sun, display: "grid", placeItems: "center", flexShrink: 0 }}><Receipt size={20} /></div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700 }}>{e.label}</div>
-              <div style={{ fontSize: 13, color: T.mut }}>{fcfa(e.amount)} · {e.by}</div>
+              <div style={{ fontSize: 13, color: T.mut }}>
+                {fcfa(e.amount)}{e.supplier ? " · " + e.supplier : ""}{e.spentAt ? " · " + e.spentAt : ""}
+              </div>
+              {e.receiptUrl && onOpenReceipt && (
+                <button onClick={async () => { const u = await onOpenReceipt(e.receiptUrl); if (u) window.open(u, "_blank"); }}
+                  style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "none", color: T.teal, fontWeight: 600, fontSize: 12.5, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                  <FileText size={13} /> Voir le justificatif
+                </button>
+              )}
             </div>
             <StatusBadge status={e.status} />
+            {onDelete && (
+              <button onClick={() => { if (window.confirm("Supprimer cette dépense ?")) onDelete(e.propId, e.id, e.receiptUrl); }}
+                style={navIcon} title="Supprimer"><X size={16} color={T.late} /></button>
+            )}
           </div>
         ))}
       </div>

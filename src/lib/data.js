@@ -16,6 +16,46 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(url, key);
 
+/* Compression d'image côté navigateur (avant upload).
+   Réduit la taille (max 1600px) et la qualité, pour économiser le stockage
+   et accélérer l'envoi. Les PDF et non-images passent tels quels. */
+export async function compressImage(file, { maxSize = 1600, quality = 0.72 } = {}) {
+  if (!file || !file.type || !file.type.startsWith("image/")) return file;
+  // les GIF (animés) ne se compressent pas bien : on laisse passer
+  if (file.type === "image/gif") return file;
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    const img = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = dataUrl;
+    });
+    let { width, height } = img;
+    if (width > maxSize || height > maxSize) {
+      if (width >= height) { height = Math.round(height * maxSize / width); width = maxSize; }
+      else { width = Math.round(width * maxSize / height); height = maxSize; }
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, width, height);
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", quality));
+    if (!blob) return file;
+    // si la compression n'aide pas, on garde l'original
+    if (blob.size >= file.size) return file;
+    const name = (file.name || "photo").replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch (e) {
+    return file; // en cas d'échec, on envoie l'original
+  }
+}
+
 /* Petit utilitaire : lève une erreur lisible, jamais un objet brut. */
 function ok({ data, error }) {
   if (error) throw new Error(error.message || "Une erreur est survenue.");
@@ -110,6 +150,11 @@ export const owner = {
   async setExpenseStatus(id, status) {
     return ok(await supabase.from("expenses").update({ status }).eq("id", id).select().single());
   },
+  async deleteExpense(id, receiptUrl) {
+    if (receiptUrl) { try { await supabase.storage.from("documents").remove([receiptUrl]); } catch (e) {} }
+    ok(await supabase.from("expenses").delete().eq("id", id));
+    return true;
+  },
   async documents() {
     return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
   },
@@ -140,7 +185,8 @@ export const manager = {
     return ok(await supabase.from("expenses").insert(row).select().single());
   },
   // Uploader un justificatif de dépense, renvoie son chemin
-  async uploadExpenseReceipt(file) {
+  async uploadExpenseReceipt(rawFile) {
+    const file = await compressImage(rawFile);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Non authentifié");
     const safe = (file.name || "justificatif").replace(/[^\w.\-]/g, "_");
@@ -180,7 +226,8 @@ export const tenant = {
     }).select().single());
   },
   // Uploade une photo de problème dans le bucket "documents", renvoie le chemin.
-  async uploadProblemPhoto(file) {
+  async uploadProblemPhoto(rawFile) {
+    const file = await compressImage(rawFile);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Non authentifié");
     const safe = (file.name || "photo.jpg").replace(/[^\w.\-]/g, "_");
@@ -265,7 +312,8 @@ export const storage = {
 /* ---------------- DOCUMENTS (gestion complète) ---------------- */
 export const docs = {
   // Uploade un fichier + crée la ligne en base. Renvoie le document créé.
-  async add(file, { category = "autre", name, propertyId = null, unitId = null }) {
+  async add(rawFile, { category = "autre", name, propertyId = null, unitId = null }) {
+    const file = await compressImage(rawFile);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Non authentifié");
     // chemin unique dans le bucket, préfixé par l'id user (isolation)
@@ -274,7 +322,7 @@ export const docs = {
     await storage.upload(path, file);
     const row = ok(await supabase.from("documents").insert({
       owner_id: user.id, property_id: propertyId, unit_id: unitId,
-      category, name: name || file.name, file_url: path,
+      category, name: name || rawFile.name, file_url: path,
     }).select().single());
     return row;
   },

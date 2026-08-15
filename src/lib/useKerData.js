@@ -307,6 +307,20 @@ export function useKerData() {
       if (!REAL) return null;
       try { return await manager.uploadExpenseReceipt(file); } catch (e) { setError(e.message || "Envoi du justificatif impossible."); return null; }
     },
+    deleteExpense: async (propId, id, receiptUrl) => {
+      if (!REAL) {
+        setDb((d) => {
+          const nd = structuredClone(d);
+          const p = nd.properties.find((x) => x.id === propId);
+          if (p) p.expenses = (p.expenses || []).filter((e) => e.id !== id);
+          return nd;
+        });
+        return;
+      }
+      setError(null);
+      try { await owner.deleteExpense(id, receiptUrl); await load(roleRef.current || "proprietaire"); }
+      catch (e) { setError(e.message || "Suppression de la dépense impossible."); }
+    },
     setExpenseStatus: wrap(
       (propId, id, status) => owner.setExpenseStatus(id, status),
       demo.setExpenseStatus),
