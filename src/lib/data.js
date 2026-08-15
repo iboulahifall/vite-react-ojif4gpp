@@ -135,12 +135,30 @@ export const tenant = {
       paid_at: new Date().toISOString().slice(0, 10), note,
     }).select().single());
   },
-  async reportProblem(unitId, { category, description, photoUrl }) {
+  async reportProblem(unitId, { category, description, photoUrls }) {
     const { data: { user } } = await supabase.auth.getUser();
+    const paths = photoUrls || [];
     return ok(await supabase.from("maintenance_requests").insert({
       unit_id: unitId, reported_by: user.id, category, description,
-      photo_url: photoUrl || null, status: "nouveau",
+      photo_url: paths[0] || null, photo_urls: paths, status: "nouveau",
     }).select().single());
+  },
+  // Uploade une photo de problème dans le bucket "documents", renvoie le chemin.
+  async uploadProblemPhoto(file) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    const safe = (file.name || "photo.jpg").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/problemes/" + Date.now() + "-" + safe;
+    const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    return data.path;
+  },
+  // Lien signé pour afficher une photo de problème
+  async photoUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
+    if (error) return null;
+    return data.signedUrl;
   },
   async myDocuments() {
     return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
