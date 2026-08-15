@@ -200,8 +200,13 @@ export function useKerData() {
                    phone: prof.phone || d.owner.phone || "" },
         }));
       } else if (role === "gestionnaire") {
-        const props = await manager.properties();
-        setDb((d) => ({ ...d, properties: adaptProperties(props) }));
+        const [props, meProf] = await Promise.all([
+          manager.properties(),
+          auth.me().catch(() => null),
+        ]);
+        const prof = (meProf && meProf.profile) || {};
+        setDb((d) => ({ ...d, properties: adaptProperties(props),
+          manager: { ...d.manager, full_name: prof.full_name || d.manager.full_name } }));
       } else if (role === "locataire") {
         const lease = await tenant.myLease();
         if (lease && lease.units) {
