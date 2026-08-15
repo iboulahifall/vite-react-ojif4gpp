@@ -179,7 +179,7 @@ export function useKerData() {
             .map((m) => ({ id: m.id, unitId: m.unit_id, unit: m.units?.label, category: m.category, desc: m.description, status: m.status, by: "—", photos: m.photo_urls || (m.photo_url ? [m.photo_url] : []),
               repairStatus: m.repair_status || "nouveau", artisan: m.artisan || "", amountEst: m.amount_est || null, amountReal: m.amount_real || null, repairNote: m.repair_note || "" }));
           p.expenses = (expenses || []).filter((e) => e.property_id === p.id)
-            .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—" }));
+            .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—", supplier: e.supplier || "", spentAt: e.spent_at || null, receiptUrl: e.receipt_url || null }));
         });
         // En réel : un propriétaire sans aucun logement doit passer par l'onboarding.
         const prof = (meProf && meProf.profile) || {};
@@ -288,9 +288,25 @@ export function useKerData() {
       try { await owner.updateRepair(id, patch); await load("proprietaire"); }
       catch (e) { setError(e.message || "Mise à jour de la réparation impossible."); }
     },
-    addExpense: wrap(
-      (propId, label, category, amount) => manager.addExpense(propId, { description: label, category, amount }),
-      demo.addExpense),
+    addExpense: async (propId, label, category, amount, by, extra) => {
+      const threshold = (db.settings && db.settings.approval_threshold) || 50000;
+      const status = amount > threshold ? "attente_validation" : "auto_validee";
+      if (!REAL) return demo.addExpense(propId, label, category, amount, by);
+      setError(null);
+      try {
+        await manager.addExpense(propId, {
+          description: label, category, amount, status,
+          supplier: (extra && extra.supplier) || null,
+          spentAt: (extra && extra.spentAt) || null,
+          receiptUrl: (extra && extra.receiptUrl) || null,
+        });
+        await load(roleRef.current || "proprietaire");
+      } catch (e) { setError(e.message || "Ajout de la dépense impossible."); }
+    },
+    uploadExpenseReceipt: async (file) => {
+      if (!REAL) return null;
+      try { return await manager.uploadExpenseReceipt(file); } catch (e) { setError(e.message || "Envoi du justificatif impossible."); return null; }
+    },
     setExpenseStatus: wrap(
       (propId, id, status) => owner.setExpenseStatus(id, status),
       demo.setExpenseStatus),
