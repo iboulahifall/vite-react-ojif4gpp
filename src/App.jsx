@@ -216,6 +216,7 @@ export default function KerApp() {
   const addProblem = (unitId, category, desc, photoUrls) => ker.reportProblem(unitId, category, desc, photoUrls);
   const uploadProblemPhoto = (file) => ker.uploadProblemPhoto(file);
   const openPhoto = (path) => ker.photoUrl(path);
+  const updateProfile = (patch) => ker.updateProfile(patch);
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
   const addExpense = (propId, label, category, amount, by) => ker.addExpense(propId, label, category, amount, by);
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
@@ -272,7 +273,7 @@ export default function KerApp() {
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onOpenPhoto={openPhoto}
       onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
-      onAddProperty={addProperty} onAddUnit={addUnit} logout={handleLogout} />;
+      onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} logout={handleLogout} />;
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={handleLogout} />;
   // Locataire en mode réel : s'il n'a pas encore de bail, on lui demande son code.
@@ -395,7 +396,7 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onOpenPhoto, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onOpenPhoto, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -416,6 +417,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onOpenPhoto, onExpenseStatus,
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
+      {view.name === "profile" && <ProfileScreen owner={db.owner} onSave={onUpdateProfile} back={() => setView({ name: "dashboard" })} />}
       {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
       {view.name === "documents" && <Documents docs={db.documents || []} properties={props} back={() => setView({ name: "dashboard" })} onReceipts={() => setView({ name: "receipts" })} onUpload={onUploadDocument} onOpen={onOpenDocument} onDelete={onDeleteDocument} />}
       {view.name === "receipts" && <ReceiptsScreen receipts={db.receipts || []} back={() => setView({ name: "documents" })} />}
@@ -491,7 +493,10 @@ function OwnerDashboard({ db, props, stats, go, logout }) {
           <div style={{ fontSize: 14, color: T.mut }}>Bonjour</div>
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700 }}>{db.owner.full_name}</div>
         </div>
-        <button onClick={logout} style={navIcon} title="Changer d'espace"><LogOut size={18} color={T.ink} /></button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => go({ name: "profile" })} style={navIcon} title="Mon profil"><Settings size={18} color={T.ink} /></button>
+          <button onClick={logout} style={navIcon} title="Changer d'espace"><LogOut size={18} color={T.ink} /></button>
+        </div>
       </div>
       <div style={{ fontSize: 13, color: T.mut, margin: "14px 0 8px", fontWeight: 600 }}>MON PATRIMOINE — CE MOIS</div>
       <div style={{ display: "flex", gap: 10 }}>
@@ -881,6 +886,8 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, onUploadPhoto, logout }
     return <ReportProblem unit={unit} back={() => setScreen("home")} onUploadPhoto={onUploadPhoto} onSubmit={(cat, desc, photos) => { onAddProblem(unitId, cat, desc, photos); setScreen("home"); }} />;
   if (screen === "receipts")
     return <ReceiptsScreen receipts={db.receipts || []} back={() => setScreen("home")} />;
+  if (screen === "contact")
+    return <ContactScreen contact={db.ownerContact} fallbackName={db.owner.full_name} back={() => setScreen("home")} />;
 
   return (
     <Shell>
@@ -916,7 +923,7 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, onUploadPhoto, logout }
           {last.status !== "paye" && <BigButton icon={Wallet} label="Enregistrer mon paiement" sub={fcfa(unit.rent)} tint={T.paid} onClick={() => onRecord(unitId, unit.rent, unit.leaseId)} />}
           <BigButton icon={Wrench} label="Signaler un probleme" sub="Eau, electricite, plomberie..." tint={T.late} onClick={() => setScreen("report")} />
           <BigButton icon={FileText} label="Mes quittances" sub="Preuves de paiement" tint={T.teal} onClick={() => setScreen("receipts")} />
-          <BigButton icon={MessageCircle} label="Contacter le proprietaire" sub={db.owner.full_name} tint={T.sun} onClick={() => {}} />
+          <BigButton icon={MessageCircle} label="Contacter le proprietaire" sub={db.owner.full_name} tint={T.sun} onClick={() => setScreen("contact")} />
         </div>
         {myProblems.length > 0 && (
           <>
@@ -1278,6 +1285,101 @@ function Documents({ docs, properties, back, onReceipts, onUpload, onOpen, onDel
     </Screen>
   );
 }
+
+/* ===================== PROFIL PROPRIÉTAIRE ===================== */
+function ProfileScreen({ owner, onSave, back }) {
+  const [name, setName] = useState(owner.full_name || "");
+  const [phone, setPhone] = useState(owner.phone || "");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState(null);
+  const save = async () => {
+    setErr(null); setSaving(true); setDone(false);
+    try {
+      await onSave({ fullName: name.trim(), phone: phone.trim() });
+      setDone(true); setTimeout(() => setDone(false), 2000);
+    } catch (e) { setErr((e && e.message) || "Enregistrement impossible."); }
+    finally { setSaving(false); }
+  };
+  return (
+    <Shell>
+      <Screen title="Mon profil" back={back}>
+        <div style={{ display: "grid", gap: 14 }}>
+          <FormField label="Nom complet">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Ibrahima Fall" style={fieldInput} />
+          </FormField>
+          <FormField label="Téléphone (avec indicatif pays)">
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ex : +221 77 123 45 67" style={fieldInput} inputMode="tel" />
+          </FormField>
+          <div style={{ fontSize: 12.5, color: T.mut }}>
+            Ce numéro permet à vos locataires de vous contacter (WhatsApp, appel). Indiquez l'indicatif du pays : +221 pour le Sénégal, +33 pour la France, +1 pour les USA/Canada…
+          </div>
+          {err && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{err}</div>}
+          <button onClick={save} disabled={saving} style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Enregistrement…" : done ? "✓ Enregistré" : "Enregistrer"}
+          </button>
+        </div>
+      </Screen>
+    </Shell>
+  );
+}
+
+/* ===================== CONTACT ===================== */
+// Nettoie un numéro pour WhatsApp (format E.164 sans + ni espaces).
+function waNumber(phone) {
+  if (!phone) return "";
+  let p = ("" + phone).replace(/[^\d+]/g, "");
+  if (p.startsWith("+")) p = p.slice(1);
+  // si numéro sénégalais local (commence par 7 et 9 chiffres), préfixer 221
+  if (/^7\d{8}$/.test(p)) p = "221" + p;
+  return p;
+}
+
+function ContactScreen({ contact, fallbackName, back }) {
+  const name = (contact && contact.name) || fallbackName || "le propriétaire";
+  const phone = contact && contact.phone;
+  const wa = waNumber(phone);
+  const hasPhone = Boolean(phone);
+  return (
+    <Shell>
+      <Screen title="Contacter" back={back}>
+        <div style={{ textAlign: "center", padding: "12px 0 20px" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: T.tealSoft, color: T.teal, display: "grid", placeItems: "center", margin: "0 auto 12px" }}>
+            <Users size={30} />
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{name}</div>
+          <div style={{ fontSize: 14, color: T.mut, marginTop: 2 }}>Propriétaire</div>
+          {hasPhone && <div style={{ fontSize: 15, color: T.ink, marginTop: 8, fontWeight: 600 }}>{phone}</div>}
+        </div>
+
+        {!hasPhone ? (
+          <div style={{ background: T.sunSoft, color: "#8A5416", borderRadius: 14, padding: 16, fontSize: 14, textAlign: "center" }}>
+            Le propriétaire n'a pas encore renseigné de numéro de téléphone. Vous pourrez le contacter dès qu'il l'aura ajouté.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            <a href={"https://wa.me/" + wa} target="_blank" rel="noreferrer"
+              style={{ ...bigContactBtn, background: "#25D366" + "18", color: "#128C4B", border: "1px solid #25D36640" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 12 }}><MessageCircle size={22} /> <span style={{ fontWeight: 700 }}>WhatsApp</span></span>
+              <ChevronRight size={18} />
+            </a>
+            <a href={"tel:" + ("" + phone).replace(/\s/g, "")}
+              style={{ ...bigContactBtn, background: T.tealSoft, color: T.teal, border: "1px solid " + T.teal + "40" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 12 }}><Users size={22} /> <span style={{ fontWeight: 700 }}>Appeler</span></span>
+              <ChevronRight size={18} />
+            </a>
+          </div>
+        )}
+        <div style={{ fontSize: 12.5, color: T.mut, marginTop: 16, textAlign: "center" }}>
+          Vos échanges se font directement, hors de KËR.
+        </div>
+      </Screen>
+    </Shell>
+  );
+}
+const bigContactBtn = { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px", borderRadius: 16, textDecoration: "none", fontSize: 16 };
+
+/* ===================== CONTACT (fin) ===================== */
 
 /* ===================== ONBOARDING PROPRIETAIRE (§26) ===================== */
 const PROP_TYPES = [

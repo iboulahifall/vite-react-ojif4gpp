@@ -167,9 +167,10 @@ export function useKerData() {
     setLoading(true); setError(null);
     try {
       if (role === "proprietaire") {
-        const [props, problems, expenses, documents, recs] = await Promise.all([
+        const [props, problems, expenses, documents, recs, meProf] = await Promise.all([
           owner.properties(), owner.problems(), owner.expenses(), owner.documents(),
           receipts.mine().catch(() => []),
+          auth.me().catch(() => null),
         ]);
         const adapted = adaptProperties(props);
         // rattacher problèmes/dépenses à leur logement
@@ -180,12 +181,15 @@ export function useKerData() {
             .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—" }));
         });
         // En réel : un propriétaire sans aucun logement doit passer par l'onboarding.
+        const prof = (meProf && meProf.profile) || {};
         setDb((d) => ({
           ...d,
           properties: adapted,
           documents: documents || [],
           receipts: recs || [],
-          owner: { ...d.owner, onboarded: adapted.length > 0 },
+          owner: { ...d.owner, onboarded: adapted.length > 0,
+                   full_name: prof.full_name || d.owner.full_name,
+                   phone: prof.phone || d.owner.phone || "" },
         }));
       } else if (role === "gestionnaire") {
         const props = await manager.properties();
@@ -206,8 +210,9 @@ export function useKerData() {
             payments: pays.length ? pays : mkHist(lease.rent_amount || 0, ["wait"]),
           };
           const recs = await receipts.mine().catch(() => []);
+          const ownerContact = await tenant.ownerContact().catch(() => null);
           setDb((d) => ({
-            ...d, tenantLease: lease, receipts: recs || [],
+            ...d, tenantLease: lease, receipts: recs || [], ownerContact: ownerContact,
             properties: [{ id: prop.id || "p_t", name: prop.name || "Mon logement", city: prop.city || "", district: "", units: [unit], problems: [], expenses: [] }],
           }));
         } else {
@@ -274,6 +279,15 @@ export function useKerData() {
       demo.setExpenseStatus),
     setThreshold: demo.setThreshold,     // réglage : local suffit (réel : table settings)
     addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
+    // --- Profil (nom, téléphone) ---
+    updateProfile: async (patch) => {
+      if (!REAL) { setDb((d) => ({ ...d, owner: { ...d.owner, ...(patch.fullName ? { full_name: patch.fullName } : {}), ...(patch.phone ? { phone: patch.phone } : {}) } })); return; }
+      setError(null);
+      try {
+        await auth.updateProfile(patch);
+        setDb((d) => ({ ...d, owner: { ...d.owner, full_name: patch.fullName ?? d.owner.full_name, phone: patch.phone ?? d.owner.phone } }));
+      } catch (e) { setError(e.message || "Mise à jour du profil impossible."); throw e; }
+    },
     // --- Documents (upload/consultation/suppression réels) ---
     uploadDocument: async (file, meta) => {
       if (!REAL) {
