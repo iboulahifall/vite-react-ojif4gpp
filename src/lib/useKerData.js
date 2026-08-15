@@ -16,7 +16,7 @@
        await ker.recordPayment(unitId);  // etc.
 */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { auth, owner, manager, tenant, receipts, docs as docsApi } from "./data.js";
+import { auth, owner, manager, tenant, receipts, docs as docsApi, notifications as notifApi } from "./data.js";
 
 const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
@@ -73,6 +73,10 @@ function demoSeed() {
     ],
     receipts: [
       { id: "r1", number: "KER-Q-2026-000001", tenant_name: "Awa", owner_name: "Ibrahima", property_name: "Immeuble Parcelles", unit_label: "Appartement B", period: "2026-07", amount: 150000, paid_at: "2026-07-05" },
+    ],
+    notifications: [
+      { id: "n1", title: "Nouveau problème signalé", body: "Plomberie — Appartement B", read: false, created_at: new Date().toISOString() },
+      { id: "n2", title: "Dépense à valider", body: "Réparation toiture — 120000 FCFA", read: false, created_at: new Date(Date.now() - 3600000).toISOString() },
     ],
   };
 }
@@ -167,10 +171,11 @@ export function useKerData() {
     setLoading(true); setError(null);
     try {
       if (role === "proprietaire") {
-        const [props, problems, expenses, documents, recs, meProf] = await Promise.all([
+        const [props, problems, expenses, documents, recs, meProf, notifs] = await Promise.all([
           owner.properties(), owner.problems(), owner.expenses(), owner.documents(),
           receipts.mine().catch(() => []),
           auth.me().catch(() => null),
+          notifApi.list().catch(() => []),
         ]);
         const adapted = adaptProperties(props);
         // rattacher problèmes/dépenses à leur logement
@@ -188,6 +193,7 @@ export function useKerData() {
           properties: adapted,
           documents: documents || [],
           receipts: recs || [],
+          notifications: notifs || [],
           owner: { ...d.owner, onboarded: adapted.length > 0,
                    full_name: prof.full_name || d.owner.full_name,
                    phone: prof.phone || d.owner.phone || "" },
@@ -334,6 +340,13 @@ export function useKerData() {
         await auth.updateProfile(patch);
         setDb((d) => ({ ...d, owner: { ...d.owner, full_name: patch.fullName ?? d.owner.full_name, phone: patch.phone ?? d.owner.phone } }));
       } catch (e) { setError(e.message || "Mise à jour du profil impossible."); throw e; }
+    },
+    // --- Notifications ---
+    notifications: db.notifications || [],
+    markNotificationsRead: async () => {
+      if (!REAL) { setDb((d) => ({ ...d, notifications: (d.notifications || []).map((n) => ({ ...n, read: true })) })); return; }
+      try { await notifApi.markAllRead(); setDb((d) => ({ ...d, notifications: (d.notifications || []).map((n) => ({ ...n, read: true })) })); }
+      catch (e) {}
     },
     // --- Documents (upload/consultation/suppression réels) ---
     uploadDocument: async (file, meta) => {
