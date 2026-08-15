@@ -3,7 +3,7 @@ import { useKerData, REAL } from "./lib/useKerData.js";
 import AuthScreen from "./lib/AuthScreen.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
-  Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, Building2,
+  Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2,
   CircleDot, ArrowRight, X, FileText, Download, Users,
   Droplet, Zap, ShowerHead, DoorClosed, Snowflake, MoreHorizontal,
   Camera, MessageCircle, Copy, Check, UserPlus, LogOut,
@@ -411,7 +411,8 @@ function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold,
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
-      {view.name === "documents" && <Documents docs={db.documents || []} back={() => setView({ name: "dashboard" })} />}
+      {view.name === "documents" && <Documents docs={db.documents || []} back={() => setView({ name: "dashboard" })} onReceipts={() => setView({ name: "receipts" })} />}
+      {view.name === "receipts" && <ReceiptsScreen receipts={db.receipts || []} back={() => setView({ name: "documents" })} />}
       {receipt && <ReceiptModal data={receipt} owner={db.owner} onSaved={onAddDocument} close={() => setReceipt(null)} />}
       {invite && <InviteModal unit={invite} close={() => setInvite(null)} />}
       {addProp && <AddPropertySheet close={() => setAddProp(false)} onAdd={(p) => { onAddProperty(p); setAddProp(false); }} />}
@@ -858,6 +859,8 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, logout }) {
 
   if (screen === "report")
     return <ReportProblem unit={unit} back={() => setScreen("home")} onSubmit={(cat, desc) => { onAddProblem(unitId, cat, desc); setScreen("home"); }} />;
+  if (screen === "receipts")
+    return <ReceiptsScreen receipts={db.receipts || []} back={() => setScreen("home")} />;
 
   return (
     <Shell>
@@ -892,7 +895,7 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, logout }) {
         <div style={{ display: "grid", gap: 10 }}>
           {last.status !== "paye" && <BigButton icon={Wallet} label="Enregistrer mon paiement" sub={fcfa(unit.rent)} tint={T.paid} onClick={() => onRecord(unitId, unit.rent, unit.leaseId)} />}
           <BigButton icon={Wrench} label="Signaler un probleme" sub="Eau, electricite, plomberie..." tint={T.late} onClick={() => setScreen("report")} />
-          <BigButton icon={FileText} label="Mes documents" sub="Quittances & contrat" tint={T.teal} onClick={() => {}} />
+          <BigButton icon={FileText} label="Mes quittances" sub="Preuves de paiement" tint={T.teal} onClick={() => setScreen("receipts")} />
           <BigButton icon={MessageCircle} label="Contacter le proprietaire" sub={db.owner.full_name} tint={T.sun} onClick={() => {}} />
         </div>
         {myProblems.length > 0 && (
@@ -1016,6 +1019,71 @@ function ReceiptModal({ data, owner, onSaved, close }) {
   );
 }
 
+/* ===================== QUITTANCES (preuves de paiement) ===================== */
+// Génère et imprime le PDF d'une quittance à partir de ses données réelles.
+function printReceipt(r) {
+  const w = window.open("", "_blank");
+  if (!w) return;
+  const money = fcfa(r.amount);
+  w.document.write("<html><head><title>Quittance " + (r.number || "") + "</title><style>"
+    + "body{font-family:Georgia,serif;color:#0B3D34;padding:48px;max-width:620px;margin:auto}"
+    + "h1{font-size:22px;border-bottom:3px solid #0E5C4F;padding-bottom:12px;margin-bottom:6px}"
+    + ".num{color:#5E6B66;font-size:13px;margin-bottom:24px}"
+    + ".row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #eee}"
+    + ".label{color:#5E6B66}.val{font-weight:700}"
+    + ".stamp{margin-top:28px;color:#1E9E77;font-size:20px;font-weight:700;border:2px solid #1E9E77;display:inline-block;padding:8px 24px;border-radius:8px}"
+    + ".foot{margin-top:40px;font-size:12px;color:#999}"
+    + "</style></head><body>"
+    + "<h1>QUITTANCE DE LOYER</h1>"
+    + "<div class='num'>N° " + (r.number || "—") + "</div>"
+    + "<div class='row'><span class='label'>Propriétaire</span><span class='val'>" + (r.owner_name || "—") + "</span></div>"
+    + "<div class='row'><span class='label'>Locataire</span><span class='val'>" + (r.tenant_name || "—") + "</span></div>"
+    + "<div class='row'><span class='label'>Logement</span><span class='val'>" + (r.property_name || "") + " · " + (r.unit_label || "") + "</span></div>"
+    + "<div class='row'><span class='label'>Période</span><span class='val'>" + (r.period || "—") + "</span></div>"
+    + "<div class='row'><span class='label'>Montant réglé</span><span class='val'>" + money + "</span></div>"
+    + "<div class='row'><span class='label'>Date de paiement</span><span class='val'>" + (r.paid_at || "—") + "</span></div>"
+    + "<div style='text-align:center'><div class='stamp'>PAYÉ</div></div>"
+    + "<p class='foot'>Quittance générée par KËR — Votre bien. Votre contrôle. "
+    + "Ce document atteste le règlement du loyer indiqué ci-dessus.</p>"
+    + "</body></html>");
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+function ReceiptsScreen({ receipts, back }) {
+  return (
+    <Screen title="Mes quittances" back={back}>
+      {(!receipts || receipts.length === 0) ? (
+        <div style={{ textAlign: "center", color: T.mut, padding: "48px 20px" }}>
+          <Receipt size={40} color={T.line} />
+          <div style={{ marginTop: 12, fontSize: 15 }}>Aucune quittance pour l'instant.</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Une quittance est créée automatiquement à chaque paiement enregistré.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {receipts.map((r) => (
+            <div key={r.id} style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{r.property_name} · {r.unit_label}</div>
+                  <div style={{ fontSize: 13, color: T.mut, marginTop: 2 }}>Période {r.period} · {r.tenant_name}</div>
+                </div>
+                <div style={{ background: T.paid + "18", color: T.paid, fontWeight: 700, fontSize: 12, padding: "4px 10px", borderRadius: 8 }}>PAYÉ</div>
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, margin: "8px 0 2px" }}>{fcfa(r.amount)}</div>
+              <div style={{ fontSize: 12, color: T.mut }}>N° {r.number} · réglé le {r.paid_at || "—"}</div>
+              <button onClick={() => printReceipt(r)} style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 12, padding: 12 }}>
+                <Download size={15} /> Télécharger la quittance (PDF)
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Screen>
+  );
+}
+
 /* ===================== DOCUMENTS (§13) ===================== */
 const DOC_META = {
   contrat:     { label: "Contrat",     icon: FileText,  tint: "#0E6E63" },
@@ -1028,7 +1096,7 @@ const DOC_META = {
 };
 const DOC_FILTERS = ["tous", "contrat", "quittance", "facture", "devis", "justificatif", "photo"];
 
-function Documents({ docs, back }) {
+function Documents({ docs, back, onReceipts }) {
   const [filter, setFilter] = useState("tous");
   const [q, setQ] = useState("");
   const list = docs.filter((d) => {
@@ -1039,6 +1107,16 @@ function Documents({ docs, back }) {
   return (
     <Screen title="Mes documents" back={back}
       action={<label style={{ ...addBtn, cursor: "pointer" }}><Upload size={16} /> Ajouter<input type="file" style={{ display: "none" }} /></label>}>
+      {onReceipts && (
+        <button onClick={onReceipts} style={{ ...cardBtn, width: "100%", marginBottom: 12 }}>
+          <span style={{ width: 40, height: 40, borderRadius: 11, background: T.paid + "18", color: T.paid, display: "grid", placeItems: "center" }}><Receipt size={18} /></span>
+          <span style={{ flex: 1, textAlign: "left" }}>
+            <span style={{ display: "block", fontWeight: 700 }}>Quittances de loyer</span>
+            <span style={{ display: "block", fontSize: 12.5, color: T.mut }}>Preuves de paiement générées automatiquement</span>
+          </span>
+          <ChevronRight size={18} color={T.mut} />
+        </button>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.card, border: "1px solid " + T.line, borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
         <Search size={16} color={T.mut} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un document"
