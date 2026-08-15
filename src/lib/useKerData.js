@@ -176,7 +176,8 @@ export function useKerData() {
         // rattacher problèmes/dépenses à leur logement
         adapted.forEach((p) => {
           p.problems = (problems || []).filter((m) => m.units?.property_id === p.id)
-            .map((m) => ({ id: m.id, unitId: m.unit_id, unit: m.units?.label, category: m.category, desc: m.description, status: m.status, by: "—", photos: m.photo_urls || (m.photo_url ? [m.photo_url] : []) }));
+            .map((m) => ({ id: m.id, unitId: m.unit_id, unit: m.units?.label, category: m.category, desc: m.description, status: m.status, by: "—", photos: m.photo_urls || (m.photo_url ? [m.photo_url] : []),
+              repairStatus: m.repair_status || "nouveau", artisan: m.artisan || "", amountEst: m.amount_est || null, amountReal: m.amount_real || null, repairNote: m.repair_note || "" }));
           p.expenses = (expenses || []).filter((e) => e.property_id === p.id)
             .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—" }));
         });
@@ -271,6 +272,22 @@ export function useKerData() {
     setProblemStatus: wrap(
       (id, status) => owner.setProblemStatus(id, status),
       demo.setProblemStatus),
+    updateRepair: async (id, patch) => {
+      if (!REAL) {
+        setDb((d) => {
+          const nd = structuredClone(d);
+          for (const p of nd.properties) {
+            const m = (p.problems || []).find((x) => x.id === id);
+            if (m) Object.assign(m, patch);
+          }
+          return nd;
+        });
+        return;
+      }
+      setError(null);
+      try { await owner.updateRepair(id, patch); await load("proprietaire"); }
+      catch (e) { setError(e.message || "Mise à jour de la réparation impossible."); }
+    },
     addExpense: wrap(
       (propId, label, category, amount) => manager.addExpense(propId, { description: label, category, amount }),
       demo.addExpense),
