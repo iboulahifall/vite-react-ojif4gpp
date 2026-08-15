@@ -172,23 +172,26 @@ function buildMonthlyReport(properties) {
   const now = new Date();
   const label = MONTHS_LONG[now.getMonth()] + " " + now.getFullYear();
   let expected = 0, paid = 0, lateCount = 0, spend = 0;
+  let rentExpected = 0, rentPaid = 0, rentLate = 0;
   let probNew = 0, probProg = 0, probDone = 0;
   properties.forEach((p) => {
     p.units.forEach((u) => {
       expected += 1;
+      rentExpected += u.rent || 0;
       const last = u.payments[u.payments.length - 1];
-      if (last.status === "paye") paid += 1;
-      if (last.status === "en_retard") lateCount += 1;
+      if (last.status === "paye") { paid += 1; rentPaid += u.rent || 0; }
+      if (last.status === "en_retard") { lateCount += 1; rentLate += u.rent || 0; }
     });
     p.problems.forEach((m) => {
-      if (m.status === "nouveau") probNew += 1;
-      else if (m.status === "en_cours") probProg += 1;
-      else probDone += 1;
+      const st = m.repairStatus || m.status;
+      if (st === "nouveau") probNew += 1;
+      else if (st === "resolu") probDone += 1;
+      else probProg += 1;
     });
     p.expenses.forEach((e) => { if (e.status === "auto_validee" || e.status === "approuvee") spend += e.amount; });
   });
   const situation = lateCount === 0 ? "ok" : "attention";
-  return { label, expected, paid, lateCount, spend, probNew, probProg, probDone, situation };
+  return { label, expected, paid, lateCount, spend, rentExpected, rentPaid, rentLate, probNew, probProg, probDone, situation };
 }
 
 export default function KerApp() {
@@ -496,7 +499,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} onDelete={onDeleteExpense} onOpenReceipt={onOpenDocument} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "profile" && <ProfileScreen owner={db.owner} onSave={onUpdateProfile} back={() => setView({ name: "dashboard" })} />}
-      {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
+      {view.name === "report" && <MonthlyReport props={props} ownerName={db.owner.full_name} back={() => setView({ name: "dashboard" })} />}
       {view.name === "documents" && <Documents docs={db.documents || []} properties={props} back={() => setView({ name: "dashboard" })} onReceipts={() => setView({ name: "receipts" })} onUpload={onUploadDocument} onOpen={onOpenDocument} onDelete={onDeleteDocument} />}
       {view.name === "receipts" && <ReceiptsScreen receipts={db.receipts || []} back={() => setView({ name: "documents" })} />}
       {receipt && <ReceiptModal data={receipt} owner={db.owner} onSaved={onAddDocument} close={() => setReceipt(null)} />}
@@ -927,7 +930,40 @@ function SettingsScreen({ threshold, onThreshold, back }) {
 }
 
 /* Rapport mensuel automatique (§17) */
-function MonthlyReport({ props, back }) {
+function printMonthlyReport(r, ownerName) {
+  const w = window.open("", "_blank");
+  if (!w) return;
+  const row = (label, val) => "<div class='row'><span class='label'>" + label + "</span><span class='val'>" + val + "</span></div>";
+  w.document.write("<html><head><title>Rapport " + r.label + "</title><style>"
+    + "body{font-family:Georgia,serif;color:#0B3D34;padding:44px;max-width:640px;margin:auto}"
+    + "h1{font-size:22px;border-bottom:3px solid #0E5C4F;padding-bottom:10px;margin-bottom:4px}"
+    + ".sub{color:#5E6B66;font-size:14px;margin-bottom:22px}"
+    + "h2{font-size:14px;color:#5E6B66;text-transform:uppercase;letter-spacing:.05em;margin:22px 0 8px}"
+    + ".row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #eee}"
+    + ".label{color:#5E6B66}.val{font-weight:700}"
+    + ".foot{margin-top:32px;font-size:12px;color:#999}"
+    + "</style></head><body>"
+    + "<h1>RAPPORT MENSUEL — KËR</h1>"
+    + "<div class='sub'>" + (ownerName ? ownerName + " · " : "") + r.label + "</div>"
+    + "<h2>Loyers</h2>"
+    + row("Loyers attendus", fcfa(r.rentExpected))
+    + row("Loyers encaissés", fcfa(r.rentPaid))
+    + row("Impayés", fcfa(r.rentLate) + " (" + r.lateCount + " logement" + (r.lateCount > 1 ? "s" : "") + ")")
+    + "<h2>Dépenses</h2>"
+    + row("Total dépenses validées", fcfa(r.spend))
+    + "<h2>Problèmes & réparations</h2>"
+    + row("Nouveaux", r.probNew)
+    + row("En cours", r.probProg)
+    + row("Résolus", r.probDone)
+    + "<p class='foot'>Rapport généré automatiquement par KËR à partir des seules données enregistrées. "
+    + "Aucune information n'est inventée.</p>"
+    + "</body></html>");
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+function MonthlyReport({ props, back, ownerName }) {
   const r = useMemo(() => buildMonthlyReport(props), [props]);
   return (
     <Screen title="Rapport mensuel" back={back} sub={r.label}>
@@ -943,9 +979,9 @@ function MonthlyReport({ props, back }) {
 
       <div style={{ fontSize: 13, color: T.mut, fontWeight: 600, margin: "18px 0 10px" }}>LOYERS</div>
       <div style={{ display: "flex", gap: 10 }}>
-        <StatCard label="Attendus" value={r.expected} />
-        <StatCard label="Payes" value={r.paid} color={T.paid} />
-        <StatCard label="En retard" value={r.lateCount} color={T.late} />
+        <StatCard label="Attendus" value={fcfa(r.rentExpected)} />
+        <StatCard label="Encaisses" value={fcfa(r.rentPaid)} color={T.paid} />
+        <StatCard label="Impayes" value={fcfa(r.rentLate)} color={T.late} />
       </div>
 
       <div style={{ fontSize: 13, color: T.mut, fontWeight: 600, margin: "18px 0 10px" }}>DEPENSES DU MOIS</div>
@@ -958,7 +994,11 @@ function MonthlyReport({ props, back }) {
         <StatCard label="Resolus" value={r.probDone} color={T.paid} />
       </div>
 
-      <div style={{ fontSize: 12.5, color: T.mut, marginTop: 18, textAlign: "center" }}>
+      <button onClick={() => printMonthlyReport(r, ownerName)} style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 20, padding: 14 }}>
+        <Download size={16} /> Télécharger le rapport (PDF)
+      </button>
+
+      <div style={{ fontSize: 12.5, color: T.mut, marginTop: 14, textAlign: "center" }}>
         Resume calcule automatiquement a partir des donnees du mois. Aucune information inventee.
       </div>
     </Screen>
