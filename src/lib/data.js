@@ -129,9 +129,25 @@ export const manager = {
   // selon settings.approval_threshold — le front n'a pas à en décider (§11).
   async addExpense(propertyId, e) {
     const { data: { user } } = await supabase.auth.getUser();
-    return ok(await supabase.from("expenses")
-      .insert({ ...e, property_id: propertyId, created_by: user.id })
-      .select().single());
+    const row = {
+      property_id: propertyId, created_by: user.id,
+      description: e.description, category: e.category, amount: e.amount,
+      status: e.status,
+    };
+    if (e.supplier !== undefined) row.supplier = e.supplier;
+    if (e.spentAt !== undefined) row.spent_at = e.spentAt;
+    if (e.receiptUrl !== undefined) row.receipt_url = e.receiptUrl;
+    return ok(await supabase.from("expenses").insert(row).select().single());
+  },
+  // Uploader un justificatif de dépense, renvoie son chemin
+  async uploadExpenseReceipt(file) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    const safe = (file.name || "justificatif").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/depenses/" + Date.now() + "-" + safe;
+    const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    return data.path;
   },
   async setProblemStatus(id, status) {
     return ok(await supabase.from("maintenance_requests").update({ status }).eq("id", id).select().single());

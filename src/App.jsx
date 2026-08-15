@@ -219,7 +219,8 @@ export default function KerApp() {
   const updateProfile = (patch) => ker.updateProfile(patch);
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
   const updateRepair = (id, patch) => ker.updateRepair(id, patch);
-  const addExpense = (propId, label, category, amount, by) => ker.addExpense(propId, label, category, amount, by);
+  const addExpense = (propId, label, category, amount, by, extra) => ker.addExpense(propId, label, category, amount, by, extra);
+  const uploadExpenseReceipt = (file) => ker.uploadExpenseReceipt(file);
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
   const setThreshold = (value) => ker.setThreshold(value);
   const addDocument = (doc) => ker.addDocument(doc);
@@ -272,11 +273,11 @@ export default function KerApp() {
     return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={handleLogout} />;
   if (session.role === "proprietaire")
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onRepair={updateRepair} onOpenPhoto={openPhoto}
-      onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument}
+      onExpenseStatus={setExpenseStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} logout={handleLogout} />;
   if (session.role === "gestionnaire")
-    return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={handleLogout} />;
+    return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} logout={handleLogout} />;
   // Locataire en mode réel : s'il n'a pas encore de bail, on lui demande son code.
   if (session.role === "locataire" && REAL && !ker.tenantLease) {
     return <JoinScreen onJoin={joinWithCode} onFind={findUnitByCode}
@@ -397,11 +398,12 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onAddExpense, onUploadReceipt, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
   const [addProp, setAddProp] = useState(false);       // formulaire ajout logement
+  const [addExp, setAddExp] = useState(false);         // formulaire ajout dépense
   const [addUnitFor, setAddUnitFor] = useState(null);  // formulaire ajout appartement (id du logement)
   const props = db.properties;
   const stats = useMemo(() => currentMonthStats(props), [props]);
@@ -416,7 +418,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
-      {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
+      {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "profile" && <ProfileScreen owner={db.owner} onSave={onUpdateProfile} back={() => setView({ name: "dashboard" })} />}
       {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
@@ -425,6 +427,8 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {receipt && <ReceiptModal data={receipt} owner={db.owner} onSaved={onAddDocument} close={() => setReceipt(null)} />}
       {invite && <InviteModal unit={invite} close={() => setInvite(null)} />}
       {addProp && <AddPropertySheet close={() => setAddProp(false)} onAdd={(p) => { onAddProperty(p); setAddProp(false); }} />}
+      {addExp && <AddExpenseSheet props={props} threshold={db.settings.approval_threshold} by={db.owner.full_name} onUploadReceipt={onUploadReceipt}
+        close={() => setAddExp(false)} onAdd={async (propId, label, cat, amount, extra) => { await onAddExpense(propId, label, cat, amount, db.owner.full_name, extra); setAddExp(false); }} />}
       {addUnitFor && <AddUnitSheet close={() => setAddUnitFor(null)} onAdd={(u) => { onAddUnit(addUnitFor, u); setAddUnitFor(null); }} />}
     </Shell>
   );
@@ -743,13 +747,16 @@ function RepairSheet({ problem, onRepair, close }) {
 }
 
 /* Depenses cote proprietaire : validation au seuil (§11) */
-function OwnerExpenses({ props, threshold, back, onStatus, go }) {
+function OwnerExpenses({ props, threshold, back, onStatus, go, onAddClick }) {
   const items = props.flatMap((p) => p.expenses.map((e) => ({ ...e, propId: p.id, propName: p.name })));
   const pending = items.filter((e) => e.status === "attente_validation");
   const others = items.filter((e) => e.status !== "attente_validation");
   return (
     <Screen title="Depenses" back={back}
-      action={<button onClick={() => go({ name: "settings" })} style={navIcon}><Settings size={18} /></button>}>
+      action={<div style={{ display: "flex", gap: 8 }}>
+        {onAddClick && <button onClick={onAddClick} style={addBtn}><Plus size={16} /> Ajouter</button>}
+        <button onClick={() => go({ name: "settings" })} style={navIcon}><Settings size={18} /></button>
+      </div>}>
       <div style={{ background: T.tealSoft, color: T.teal, borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 600, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
         <ShieldCheck size={16} /> Au-dela de {fcfa(threshold)}, votre validation est requise.
       </div>
@@ -853,7 +860,7 @@ function MonthlyReport({ props, back }) {
 }
 
 /* ===================== GESTIONNAIRE (§2 role 3) ===================== */
-function ManagerApp({ db, onProblemStatus, onAddExpense, logout }) {
+function ManagerApp({ db, onProblemStatus, onAddExpense, onUploadReceipt, logout }) {
   const [view, setView] = useState({ name: "home" });
   const [addOpen, setAddOpen] = useState(false);
   const props = db.properties; // en reel : filtres par property_managers (RLS)
@@ -891,8 +898,8 @@ function ManagerApp({ db, onProblemStatus, onAddExpense, logout }) {
       )}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "home" })} onStatus={onProblemStatus} />}
       {view.name === "expenses" && <ManagerExpenses props={props} threshold={threshold} back={() => setView({ name: "home" })} onAdd={() => setAddOpen(true)} />}
-      {addOpen && <AddExpenseSheet props={props} threshold={threshold} by={db.manager.full_name}
-        close={() => setAddOpen(false)} onAdd={(propId, label, cat, amount) => { onAddExpense(propId, label, cat, amount, db.manager.full_name); setAddOpen(false); }} />}
+      {addOpen && <AddExpenseSheet props={props} threshold={threshold} by={db.manager.full_name} onUploadReceipt={onUploadReceipt}
+        close={() => setAddOpen(false)} onAdd={async (propId, label, cat, amount, extra) => { await onAddExpense(propId, label, cat, amount, db.manager.full_name, extra); setAddOpen(false); }} />}
     </Shell>
   );
 }
@@ -917,14 +924,42 @@ function ManagerExpenses({ props, threshold, back, onAdd }) {
   );
 }
 
-function AddExpenseSheet({ props, threshold, by, close, onAdd }) {
+function AddExpenseSheet({ props, threshold, by, close, onAdd, onUploadReceipt }) {
   const [propId, setPropId] = useState(props[0].id);
   const [label, setLabel] = useState("");
   const [cat, setCat] = useState(EXPENSE_CATS[0]);
   const [amount, setAmount] = useState("");
+  const [supplier, setSupplier] = useState("");
+  const [spentAt, setSpentAt] = useState(new Date().toISOString().slice(0, 10));
+  const [receipt, setReceipt] = useState(null);   // { name, path }
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
   const num = parseInt(amount.replace(/\D/g, ""), 10) || 0;
   const needsApproval = num > threshold;
   const valid = label.trim() && num > 0;
+
+  const pickReceipt = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setErr(null);
+    if (file.size > 10 * 1024 * 1024) { setErr("Fichier trop lourd (max 10 Mo)."); return; }
+    if (!onUploadReceipt) { setReceipt({ name: file.name, path: null }); return; }
+    setUploading(true);
+    try {
+      const path = await onUploadReceipt(file);
+      setReceipt({ name: file.name, path });
+    } catch (e2) { setErr("Envoi du justificatif impossible."); }
+    finally { setUploading(false); }
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    await onAdd(propId, label.trim(), cat, num, { supplier: supplier.trim(), spentAt, receiptUrl: receipt && receipt.path });
+    setSaving(false);
+  };
+
   return (
     <Sheet close={close} title="Ajouter une depense">
       <div style={{ display: "grid", gap: 12 }}>
@@ -945,8 +980,30 @@ function AddExpenseSheet({ props, threshold, by, close, onAdd }) {
           </select>
         </div>
         <div>
+          <div style={fieldLabel}>Fournisseur (optionnel)</div>
+          <input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Ex : Quincaillerie Diop" style={fieldInput} />
+        </div>
+        <div>
+          <div style={fieldLabel}>Date de la dépense</div>
+          <input type="date" value={spentAt} onChange={(e) => setSpentAt(e.target.value)} style={fieldInput} />
+        </div>
+        <div>
           <div style={fieldLabel}>Montant (FCFA)</div>
           <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder="0" style={fieldInput} />
+        </div>
+        <div>
+          <div style={fieldLabel}>Justificatif (photo ou PDF, optionnel)</div>
+          {receipt ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.tealSoft, color: T.teal, borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 600 }}>
+              <FileText size={15} /> <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{receipt.name}</span>
+              <button onClick={() => setReceipt(null)} style={{ border: "none", background: "transparent", cursor: "pointer", color: T.late, display: "flex" }}><X size={14} /></button>
+            </div>
+          ) : (
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: T.card, color: T.teal, border: "2px dashed " + T.teal, borderRadius: 12, padding: 12, cursor: uploading ? "default" : "pointer", fontWeight: 700, opacity: uploading ? 0.6 : 1 }}>
+              <Upload size={16} /> {uploading ? "Envoi…" : "Joindre un justificatif"}
+              <input type="file" accept="image/*,application/pdf" onChange={pickReceipt} disabled={uploading} style={{ display: "none" }} />
+            </label>
+          )}
         </div>
         {num > 0 && (
           <div style={{ borderRadius: 12, padding: "10px 14px", fontSize: 13, fontWeight: 600,
@@ -956,9 +1013,10 @@ function AddExpenseSheet({ props, threshold, by, close, onAdd }) {
             {needsApproval ? "Au-dessus de " + fcfa(threshold) + " — validation du proprietaire requise." : "Sous le seuil — sera validee automatiquement."}
           </div>
         )}
-        <button disabled={!valid} onClick={() => onAdd(propId, label.trim(), cat, num)}
-          style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: valid ? 1 : 0.4 }}>
-          Enregistrer la depense
+        {err && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{err}</div>}
+        <button disabled={!valid || saving || uploading} onClick={submit}
+          style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: (valid && !saving && !uploading) ? 1 : 0.4 }}>
+          {saving ? "Enregistrement…" : "Enregistrer la depense"}
         </button>
       </div>
     </Sheet>
