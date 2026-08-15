@@ -218,6 +218,7 @@ export default function KerApp() {
   const openPhoto = (path) => ker.photoUrl(path);
   const updateProfile = (patch) => ker.updateProfile(patch);
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
+  const updateRepair = (id, patch) => ker.updateRepair(id, patch);
   const addExpense = (propId, label, category, amount, by) => ker.addExpense(propId, label, category, amount, by);
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
   const setThreshold = (value) => ker.setThreshold(value);
@@ -270,7 +271,7 @@ export default function KerApp() {
   if (session.role === "proprietaire" && !db.owner.onboarded)
     return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={handleLogout} />;
   if (session.role === "proprietaire")
-    return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onOpenPhoto={openPhoto}
+    return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onRepair={updateRepair} onOpenPhoto={openPhoto}
       onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} logout={handleLogout} />;
@@ -396,7 +397,7 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onOpenPhoto, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -414,7 +415,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onOpenPhoto, onExpenseStatus,
       {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} onAdd={() => setAddProp(true)} />}
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
-      {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onOpenPhoto={onOpenPhoto} />}
+      {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "profile" && <ProfileScreen owner={db.owner} onSave={onUpdateProfile} back={() => setView({ name: "dashboard" })} />}
@@ -609,44 +610,135 @@ function Rents({ props, back, onRecord, onReceipt }) {
   );
 }
 
-function Problems({ props, back, onStatus, onOpenPhoto }) {
+const REPAIR_STEPS = [
+  { key: "nouveau", label: "Nouveau", tint: "#C0563F" },
+  { key: "pris_en_charge", label: "Pris en charge", tint: "#E0A020" },
+  { key: "devis", label: "Devis", tint: "#2C77C9" },
+  { key: "en_intervention", label: "En intervention", tint: "#7A5CC0" },
+  { key: "resolu", label: "Résolu", tint: "#1E9E77" },
+];
+
+function Problems({ props, back, onStatus, onRepair, onOpenPhoto }) {
   const items = props.flatMap((p) => p.problems.map((m) => ({ ...m, propName: p.name })));
+  const [edit, setEdit] = useState(null);   // problème en cours d'édition (réparation)
   const openPhoto = async (path) => {
     if (!onOpenPhoto) return;
     const url = await onOpenPhoto(path);
     if (url) window.open(url, "_blank");
   };
+  const stepMeta = (k) => REPAIR_STEPS.find((s) => s.key === k) || REPAIR_STEPS[0];
   return (
     <Screen title="Problemes signales" back={back}>
       <div style={{ display: "grid", gap: 12 }}>
         {items.length === 0 && <Empty text="Aucun probleme signale. Tout va bien." />}
-        {items.map((m) => (
-          <div key={m.id} style={card}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>{m.category}</div>
-              <StatusBadge status={m.status} />
+        {items.map((m) => {
+          const rs = m.repairStatus || "nouveau";
+          const sm = stepMeta(rs);
+          return (
+            <div key={m.id} style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontWeight: 700 }}>{m.category}</div>
+                <span style={{ background: sm.tint + "18", color: sm.tint, fontWeight: 700, fontSize: 12, padding: "4px 10px", borderRadius: 8 }}>{sm.label}</span>
+              </div>
+              <div style={{ fontSize: 13, color: T.mut, marginTop: 2 }}>{m.unit}</div>
+              <div style={{ fontSize: 14, marginTop: 8 }}>{m.desc}</div>
+
+              {m.photos && m.photos.length > 0 && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                  {m.photos.map((ph, i) => (
+                    <button key={i} onClick={() => openPhoto(ph)} style={{ display: "flex", alignItems: "center", gap: 6, background: T.tealSoft, color: T.teal, border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                      <ImageIcon size={14} /> Voir photo {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Récap intervention si renseigné */}
+              {(m.artisan || m.amountEst || m.amountReal) && (
+                <div style={{ background: T.paper, borderRadius: 12, padding: "10px 12px", marginTop: 10, fontSize: 13 }}>
+                  {m.artisan && <div><span style={{ color: T.mut }}>Artisan : </span><b>{m.artisan}</b></div>}
+                  {m.amountEst ? <div><span style={{ color: T.mut }}>Devis : </span><b>{fcfa(m.amountEst)}</b></div> : null}
+                  {m.amountReal ? <div><span style={{ color: T.mut }}>Coût réel : </span><b>{fcfa(m.amountReal)}</b></div> : null}
+                  {m.repairNote && <div style={{ marginTop: 4, color: T.ink }}>{m.repairNote}</div>}
+                </div>
+              )}
+
+              {rs !== "resolu" && onRepair && (
+                <button onClick={() => setEdit(m)} style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 12, padding: 12 }}>
+                  <Wrench size={15} /> Gérer la réparation
+                </button>
+              )}
+              {rs !== "resolu" && !onRepair && (
+                <button onClick={() => onStatus(m.id, "resolu")} style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 12, padding: 12 }}>
+                  Marquer résolu
+                </button>
+              )}
             </div>
-            <div style={{ fontSize: 13, color: T.mut, marginTop: 2 }}>{m.unit} · signale par {m.by}</div>
-            <div style={{ fontSize: 14, marginTop: 8 }}>{m.desc}</div>
-            {m.photos && m.photos.length > 0 && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                {m.photos.map((ph, i) => (
-                  <button key={i} onClick={() => openPhoto(ph)} style={{ display: "flex", alignItems: "center", gap: 6, background: T.tealSoft, color: T.teal, border: "none", borderRadius: 10, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                    <ImageIcon size={14} /> Voir photo {i + 1}
-                  </button>
-                ))}
-              </div>
-            )}
-            {m.status !== "resolu" && (
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                {m.status === "nouveau" && <button onClick={() => onStatus(m.id, "en_cours")} style={{ ...ghostBtn, flex: 1 }}>Prendre en charge</button>}
-                <button onClick={() => onStatus(m.id, "resolu")} style={{ ...primaryBtn, flex: 1 }}>Marquer resolu</button>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {edit && <RepairSheet problem={edit} onRepair={onRepair} close={() => setEdit(null)} />}
     </Screen>
+  );
+}
+
+/* Feuille : piloter le workflow de réparation */
+function RepairSheet({ problem, onRepair, close }) {
+  const [rs, setRs] = useState(problem.repairStatus || "nouveau");
+  const [artisan, setArtisan] = useState(problem.artisan || "");
+  const [est, setEst] = useState(problem.amountEst ? String(problem.amountEst) : "");
+  const [real, setReal] = useState(problem.amountReal ? String(problem.amountReal) : "");
+  const [note, setNote] = useState(problem.repairNote || "");
+  const [saving, setSaving] = useState(false);
+  const toNum = (v) => parseInt(("" + v).replace(/\D/g, ""), 10) || null;
+
+  const save = async () => {
+    setSaving(true);
+    await onRepair(problem.id, {
+      repairStatus: rs, artisan: artisan.trim(),
+      amountEst: toNum(est), amountReal: toNum(real), note: note.trim(),
+    });
+    setSaving(false);
+    close();
+  };
+
+  return (
+    <Sheet close={close} title="Gérer la réparation">
+      <div style={{ display: "grid", gap: 14 }}>
+        <div>
+          <div style={fieldLabel}>Étape</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {REPAIR_STEPS.map((s) => {
+              const on = rs === s.key;
+              return (
+                <button key={s.key} onClick={() => setRs(s.key)} style={{
+                  padding: "8px 12px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 13, fontWeight: 700, border: "1px solid " + (on ? s.tint : T.line),
+                  background: on ? s.tint : T.card, color: on ? "#fff" : T.mut }}>
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <FormField label="Artisan (nom / téléphone)">
+          <input value={artisan} onChange={(e) => setArtisan(e.target.value)} placeholder="Ex : Modou Plombier — 77…" style={fieldInput} />
+        </FormField>
+        <FormField label="Devis estimé (FCFA)">
+          <input value={est} onChange={(e) => setEst(e.target.value)} inputMode="numeric" placeholder="Ex : 25000" style={fieldInput} />
+        </FormField>
+        <FormField label="Coût réel (FCFA)">
+          <input value={real} onChange={(e) => setReal(e.target.value)} inputMode="numeric" placeholder="Ex : 22000" style={fieldInput} />
+        </FormField>
+        <FormField label="Note d'intervention">
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Ex : Pièce changée, testé OK." style={{ ...fieldInput, resize: "none" }} />
+        </FormField>
+        <button onClick={save} disabled={saving} style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: saving ? 0.6 : 1 }}>
+          {saving ? "Enregistrement…" : "Enregistrer"}
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

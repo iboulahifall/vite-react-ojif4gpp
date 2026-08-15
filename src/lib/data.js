@@ -93,6 +93,17 @@ export const owner = {
   async setProblemStatus(id, status) {
     return ok(await supabase.from("maintenance_requests").update({ status }).eq("id", id).select().single());
   },
+  async updateRepair(id, patch) {
+    const clean = {};
+    if (patch.repairStatus !== undefined) clean.repair_status = patch.repairStatus;
+    if (patch.artisan !== undefined) clean.artisan = patch.artisan;
+    if (patch.amountEst !== undefined) clean.amount_est = patch.amountEst;
+    if (patch.amountReal !== undefined) clean.amount_real = patch.amountReal;
+    if (patch.note !== undefined) clean.repair_note = patch.note;
+    if (patch.repairStatus === "resolu") clean.status = "resolu";
+    else if (patch.repairStatus && patch.repairStatus !== "nouveau") clean.status = "en_cours";
+    return ok(await supabase.from("maintenance_requests").update(clean).eq("id", id).select().single());
+  },
   async expenses() {
     return ok(await supabase.from("expenses").select("*").order("created_at", { ascending: false }));
   },
