@@ -88,6 +88,7 @@ function demoSeed() {
 function adaptProperties(rows) {
   return (rows || []).map((p) => ({
     id: p.id, name: p.name, type: p.type, city: p.city, district: p.district,
+    managerCode: p.manager_code || "",
     units: (p.units || []).map((u) => {
       const lease = (u.leases || [])[0] || {};
       const pays = (lease.rent_payments || []).map((r) => ({
@@ -341,6 +342,19 @@ export function useKerData() {
         setDb((d) => ({ ...d, owner: { ...d.owner, full_name: patch.fullName ?? d.owner.full_name, phone: patch.phone ?? d.owner.phone } }));
       } catch (e) { setError(e.message || "Mise à jour du profil impossible."); throw e; }
     },
+    // --- Affectation gestionnaire ---
+    findPropertyByCode: async (code) => {
+      if (!REAL) return { property_name: "Immeuble Parcelles", city: "Dakar" };
+      return manager.findPropertyByCode(code);
+    },
+    joinAsManager: async (code, fullName) => {
+      if (!REAL) { await load("gestionnaire"); return "demo"; }
+      setError(null);
+      const id = await manager.joinAsManager(code, fullName);
+      await load("gestionnaire");
+      return id;
+    },
+    managerHasProperties: (db.properties && db.properties.length > 0),
     // --- Notifications ---
     notifications: db.notifications || [],
     markNotificationsRead: async () => {

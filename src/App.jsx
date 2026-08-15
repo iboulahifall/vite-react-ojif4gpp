@@ -234,6 +234,8 @@ export default function KerApp() {
   const completeOnboarding = (payload) => ker.completeOnboarding(payload);
   const joinWithCode = (code, fullName) => ker.joinWithCode(code, fullName);
   const findUnitByCode = (code) => ker.findUnitByCode(code);
+  const joinAsManager = (code, fullName) => ker.joinAsManager(code, fullName);
+  const findPropertyByCode = (code) => ker.findPropertyByCode(code);
 
   // Sélection d'un espace : mémorise la session ET déclenche le chargement réel.
   const setSession = (s) => {
@@ -278,6 +280,10 @@ export default function KerApp() {
       onExpenseStatus={setExpenseStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} onDeleteExpense={deleteExpense} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} onMarkNotifsRead={markNotificationsRead} logout={handleLogout} />;
+  if (session.role === "gestionnaire" && REAL && !ker.managerHasProperties) {
+    return <ManagerJoinScreen onJoin={joinAsManager} onFind={findPropertyByCode}
+      defaultName={(authUser && authUser.profile && authUser.profile.full_name) || ""} logout={handleLogout} />;
+  }
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} logout={handleLogout} />;
   // Locataire en mode réel : s'il n'a pas encore de bail, on lui demande son code.
@@ -293,6 +299,72 @@ export default function KerApp() {
 }
 
 /* Écran locataire : rejoindre son logement avec un code d'invitation */
+/* Écran gestionnaire : rejoindre un logement à gérer via code GES-XXXXX */
+function ManagerJoinScreen({ onJoin, onFind, defaultName, logout }) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState(defaultName || "");
+  const [found, setFound] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState(null);
+
+  const check = async () => {
+    setError(null); setFound(null);
+    if (!code.trim()) return;
+    setChecking(true);
+    try {
+      const p = await onFind(code.trim());
+      if (p) setFound(p);
+      else setError("Ce code ne correspond à aucun logement.");
+    } catch (e) { setError("Impossible de vérifier le code."); }
+    finally { setChecking(false); }
+  };
+
+  const join = async () => {
+    setError(null); setJoining(true);
+    try { await onJoin(code.trim(), name.trim()); }
+    catch (e) { setError((e && e.message) || "Impossible de rejoindre ce logement."); setJoining(false); }
+  };
+
+  return (
+    <Shell>
+      <div style={{ paddingTop: 40, textAlign: "center" }}>
+        <KerMark size={54} />
+        <div style={{ fontSize: 22, fontWeight: 800, marginTop: 12 }}>Gérer un logement</div>
+        <div style={{ fontSize: 14, color: T.mut, marginTop: 6 }}>Entrez le code de gestion communiqué par le propriétaire.</div>
+      </div>
+      <div style={{ marginTop: 24, display: "grid", gap: 12 }}>
+        <div>
+          <div style={fieldLabel}>Votre nom</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Awa Ndiaye" style={fieldInput} />
+        </div>
+        <div>
+          <div style={fieldLabel}>Code de gestion</div>
+          <input value={code} onChange={(e) => { setCode(e.target.value); setFound(null); }} placeholder="GES-45821"
+            style={{ ...fieldInput, letterSpacing: "0.08em", textTransform: "uppercase" }} />
+        </div>
+        {!found && (
+          <button onClick={check} disabled={checking || !code.trim()} style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: (checking || !code.trim()) ? 0.5 : 1 }}>
+            {checking ? "Vérification…" : "Vérifier le code"}
+          </button>
+        )}
+        {found && (
+          <div style={{ background: T.tealSoft, borderRadius: 14, padding: 16 }}>
+            <div style={{ fontSize: 13, color: T.mut }}>Logement trouvé</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginTop: 2 }}>{found.property_name}</div>
+            {found.city && <div style={{ fontSize: 14, color: T.mut, marginTop: 2 }}>{found.city}</div>}
+            <button onClick={join} disabled={joining} style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: 14, marginTop: 12, opacity: joining ? 0.6 : 1 }}>
+              {joining ? "Un instant…" : "Gérer ce logement"}
+            </button>
+          </div>
+        )}
+        {error && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{error}</div>}
+        <button onClick={logout} style={{ ...ghostBtn, justifyContent: "center", padding: 12, marginTop: 4 }}>Se déconnecter</button>
+      </div>
+    </Shell>
+  );
+}
+
 function JoinScreen({ onJoin, onFind, defaultName, logout }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState(defaultName || "");
@@ -586,6 +658,17 @@ function PropertyDetail({ property, back, onInvite, onAddUnit }) {
         })}
       </div>
       <button onClick={onAddUnit} style={{ ...addBtn, width: "100%", justifyContent: "center", marginTop: 14, padding: "14px" }}><Plus size={16} /> Ajouter un appartement</button>
+
+      {property.managerCode && (
+        <div style={{ ...card, marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><ClipboardList size={17} color={T.teal} /> Confier à un gestionnaire</div>
+          <div style={{ fontSize: 13, color: T.mut, marginTop: 6 }}>Communiquez ce code à la personne qui gère ce bien sur place. Elle crée un compte « Gestionnaire » et entre ce code.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+            <div style={{ flex: 1, fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 700, color: T.teal, letterSpacing: "0.04em" }}>{property.managerCode}</div>
+            <button onClick={() => { try { navigator.clipboard.writeText(property.managerCode); } catch (e) {} }} style={ghostBtn}><Copy size={15} /> Copier</button>
+          </div>
+        </div>
+      )}
     </Screen>
   );
 }
