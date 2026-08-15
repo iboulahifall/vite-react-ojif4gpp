@@ -212,13 +212,15 @@ export default function KerApp() {
   const db = ker.db;
   const session = sessionState;
 
-  const recordPayment = (unitId) => ker.recordPayment(unitId);
+  const recordPayment = (unitId, rent) => ker.recordPayment(unitId, rent);
   const addProblem = (unitId, category, desc) => ker.reportProblem(unitId, category, desc);
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
   const addExpense = (propId, label, category, amount, by) => ker.addExpense(propId, label, category, amount, by);
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
   const setThreshold = (value) => ker.setThreshold(value);
   const addDocument = (doc) => ker.addDocument(doc);
+  const addProperty = (p) => ker.addProperty(p);
+  const addUnit = (propId, u) => ker.addUnit(propId, u);
   const completeOnboarding = (payload) => ker.completeOnboarding(payload);
 
   // Sélection d'un espace : mémorise la session ET déclenche le chargement réel.
@@ -261,7 +263,8 @@ export default function KerApp() {
     return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={handleLogout} />;
   if (session.role === "proprietaire")
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus}
-      onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument} logout={handleLogout} />;
+      onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument}
+      onAddProperty={addProperty} onAddUnit={addUnit} logout={handleLogout} />;
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={handleLogout} />;
   return <TenantApp db={db} unitId={session.unitId} onRecord={recordPayment} onAddProblem={addProblem} logout={handleLogout} />;
@@ -300,10 +303,12 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold, onAddDocument, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold, onAddDocument, onAddProperty, onAddUnit, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
+  const [addProp, setAddProp] = useState(false);       // formulaire ajout logement
+  const [addUnitFor, setAddUnitFor] = useState(null);  // formulaire ajout appartement (id du logement)
   const props = db.properties;
   const stats = useMemo(() => currentMonthStats(props), [props]);
   const items = [
@@ -313,8 +318,8 @@ function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold,
   return (
     <Shell nav={<BottomNav items={items} active={view.name} onPick={(n) => setView({ name: n })} />}>
       {view.name === "dashboard" && <OwnerDashboard db={db} props={props} stats={stats} go={setView} logout={logout} />}
-      {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} />}
-      {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} />}
+      {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} onAdd={() => setAddProp(true)} />}
+      {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
@@ -323,8 +328,65 @@ function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold,
       {view.name === "documents" && <Documents docs={db.documents || []} back={() => setView({ name: "dashboard" })} />}
       {receipt && <ReceiptModal data={receipt} owner={db.owner} onSaved={onAddDocument} close={() => setReceipt(null)} />}
       {invite && <InviteModal unit={invite} close={() => setInvite(null)} />}
+      {addProp && <AddPropertySheet close={() => setAddProp(false)} onAdd={(p) => { onAddProperty(p); setAddProp(false); }} />}
+      {addUnitFor && <AddUnitSheet close={() => setAddUnitFor(null)} onAdd={(u) => { onAddUnit(addUnitFor, u); setAddUnitFor(null); }} />}
     </Shell>
   );
+}
+
+/* Formulaire : ajouter un logement */
+function AddPropertySheet({ close, onAdd }) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState("appartement");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+  const [unitLabel, setUnitLabel] = useState("");
+  const [rent, setRent] = useState("");
+  const rentNum = parseInt(("" + rent).replace(/\D/g, ""), 10) || 0;
+  const valid = name.trim() && city.trim();
+  return (
+    <Sheet close={close} title="Ajouter un logement">
+      <div style={{ display: "grid", gap: 12 }}>
+        <FormField label="Nom du logement"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Immeuble Parcelles" style={fieldInput} /></FormField>
+        <FormField label="Type">
+          <select value={type} onChange={(e) => setType(e.target.value)} style={fieldInput}>
+            <option value="maison">Maison</option><option value="appartement">Appartement</option>
+            <option value="immeuble">Immeuble</option><option value="boutique">Boutique</option>
+            <option value="local_commercial">Local commercial</option>
+          </select>
+        </FormField>
+        <FormField label="Ville"><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex : Dakar" style={fieldInput} /></FormField>
+        <FormField label="Quartier (optionnel)"><input value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Ex : Parcelles Assainies" style={fieldInput} /></FormField>
+        <div style={{ height: 1, background: T.line, margin: "2px 0" }} />
+        <FormField label="Premier appartement / unité (optionnel)"><input value={unitLabel} onChange={(e) => setUnitLabel(e.target.value)} placeholder="Ex : Appartement A" style={fieldInput} /></FormField>
+        <FormField label="Loyer (FCFA)"><input value={rent} onChange={(e) => setRent(e.target.value)} inputMode="numeric" placeholder="150000" style={fieldInput} /></FormField>
+        <button disabled={!valid} onClick={() => onAdd({ name: name.trim(), type, city: city.trim(), district: district.trim(), unitLabel: unitLabel.trim(), rent: rentNum })}
+          style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: valid ? 1 : 0.4 }}>Enregistrer le logement</button>
+      </div>
+    </Sheet>
+  );
+}
+
+/* Formulaire : ajouter un appartement à un logement */
+function AddUnitSheet({ close, onAdd }) {
+  const [label, setLabel] = useState("");
+  const [rent, setRent] = useState("");
+  const rentNum = parseInt(("" + rent).replace(/\D/g, ""), 10) || 0;
+  const valid = label.trim();
+  return (
+    <Sheet close={close} title="Ajouter un appartement">
+      <div style={{ display: "grid", gap: 12 }}>
+        <FormField label="Nom de l'appartement / unité"><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex : Appartement B" style={fieldInput} /></FormField>
+        <FormField label="Loyer (FCFA)"><input value={rent} onChange={(e) => setRent(e.target.value)} inputMode="numeric" placeholder="150000" style={fieldInput} /></FormField>
+        <button disabled={!valid} onClick={() => onAdd({ label: label.trim(), rent: rentNum })}
+          style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: valid ? 1 : 0.4 }}>Ajouter l'appartement</button>
+      </div>
+    </Sheet>
+  );
+}
+
+function FormField({ label, children }) {
+  return <div><div style={fieldLabel}>{label}</div>{children}</div>;
 }
 
 function OwnerDashboard({ db, props, stats, go, logout }) {
@@ -366,9 +428,9 @@ function OwnerDashboard({ db, props, stats, go, logout }) {
   );
 }
 
-function Properties({ props, go, back }) {
+function Properties({ props, go, back, onAdd }) {
   return (
-    <Screen title="Mes logements" back={back} action={<button style={addBtn}><Plus size={16} /> Ajouter</button>}>
+    <Screen title="Mes logements" back={back} action={<button onClick={onAdd} style={addBtn}><Plus size={16} /> Ajouter</button>}>
       <div style={{ display: "grid", gap: 12 }}>
         {props.map((p) => (
           <button key={p.id} onClick={() => go({ name: "property", id: p.id })} style={cardBtn}>
@@ -385,7 +447,7 @@ function Properties({ props, go, back }) {
   );
 }
 
-function PropertyDetail({ property, back, onInvite }) {
+function PropertyDetail({ property, back, onInvite, onAddUnit }) {
   if (!property) return null;
   return (
     <Screen title={property.name} back={back} sub={property.city + " · " + property.district}>
@@ -409,7 +471,7 @@ function PropertyDetail({ property, back, onInvite }) {
           );
         })}
       </div>
-      <button style={{ ...addBtn, width: "100%", justifyContent: "center", marginTop: 14, padding: "14px" }}><Plus size={16} /> Ajouter un appartement</button>
+      <button onClick={onAddUnit} style={{ ...addBtn, width: "100%", justifyContent: "center", marginTop: 14, padding: "14px" }}><Plus size={16} /> Ajouter un appartement</button>
     </Screen>
   );
 }
@@ -438,7 +500,7 @@ function Rents({ props, back, onRecord, onReceipt }) {
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 {last.status !== "paye"
-                  ? <button onClick={() => onRecord(u.id)} style={{ ...primaryBtn, flex: 1 }}>Enregistrer le paiement</button>
+                  ? <button onClick={() => onRecord(u.id, u.rent)} style={{ ...primaryBtn, flex: 1 }}>Enregistrer le paiement</button>
                   : <button onClick={() => onReceipt({ unit: u, period: last.period, paid_at: last.paid_at })} style={{ ...ghostBtn, flex: 1 }}><FileText size={15} /> Quittance</button>}
               </div>
             </div>
