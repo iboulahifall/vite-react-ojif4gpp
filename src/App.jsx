@@ -957,7 +957,7 @@ function AddExpenseSheet({ props, threshold, by, close, onAdd, onUploadReceipt }
     e.target.value = "";
     if (!file) return;
     setErr(null);
-    if (file.size > 10 * 1024 * 1024) { setErr("Fichier trop lourd (max 10 Mo)."); return; }
+    if (file.size > 40 * 1024 * 1024) { setErr("Fichier trop lourd (max 40 Mo)."); return; }
     if (!onUploadReceipt) { setReceipt({ name: file.name, path: null }); return; }
     setUploading(true);
     try {
@@ -1122,7 +1122,7 @@ function ReportProblem({ unit, back, onSubmit, onUploadPhoto }) {
     e.target.value = "";
     if (!file) return;
     setErr(null);
-    if (file.size > 10 * 1024 * 1024) { setErr("Photo trop lourde (max 10 Mo)."); return; }
+    if (file.size > 40 * 1024 * 1024) { setErr("Photo trop lourde (max 40 Mo)."); return; }
     if (!onUploadPhoto) { setErr("Envoi de photo indisponible."); return; }
     setUploading(true);
     try {
@@ -1342,7 +1342,7 @@ function Documents({ docs, properties, back, onReceipts, onUpload, onOpen, onDel
     if (!file) return;
     setErr(null);
     // limite raisonnable : 10 Mo
-    if (file.size > 10 * 1024 * 1024) { setErr("Fichier trop volumineux (max 10 Mo)."); return; }
+    if (file.size > 40 * 1024 * 1024) { setErr("Fichier trop volumineux (max 40 Mo)."); return; }
     setPending({ file, category: "facture", name: file.name });
     e.target.value = ""; // permet de re-choisir le même fichier
   };
