@@ -166,6 +166,14 @@ owner.unitInviteCode = async function (unitId) {
   return data.invite_code;
 };
 
+/* ---------------- QUITTANCES (preuves de paiement) ---------------- */
+export const receipts = {
+  // Toutes les quittances qui me concernent (RLS filtre : mes quittances locataire OU proprio)
+  async mine() {
+    return ok(await supabase.from("receipts").select("*").order("created_at", { ascending: false }));
+  },
+};
+
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
 export const storage = {
   // Bucket privé "documents" à créer dans Supabase. Upload compressé côté client

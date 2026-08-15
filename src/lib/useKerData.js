@@ -16,7 +16,7 @@
        await ker.recordPayment(unitId);  // etc.
 */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { auth, owner, manager, tenant } from "./data.js";
+import { auth, owner, manager, tenant, receipts } from "./data.js";
 
 const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
@@ -70,6 +70,9 @@ function demoSeed() {
       { id: "d1", category: "quittance", name: "Quittance Awa — dernier mois", unit: "Appartement B", date: "05/" + (new Date().getMonth() + 1) + "/" + new Date().getFullYear() },
       { id: "d2", category: "contrat", name: "Bail Mamadou", unit: "Appartement A", date: "12/01/2024" },
       { id: "d3", category: "facture", name: "Facture plomberie App. B", unit: "Appartement B", date: "02/" + (new Date().getMonth() + 1) + "/" + new Date().getFullYear() },
+    ],
+    receipts: [
+      { id: "r1", number: "KER-Q-2026-000001", tenant_name: "Awa", owner_name: "Ibrahima", property_name: "Immeuble Parcelles", unit_label: "Appartement B", period: "2026-07", amount: 150000, paid_at: "2026-07-05" },
     ],
   };
 }
@@ -164,8 +167,9 @@ export function useKerData() {
     setLoading(true); setError(null);
     try {
       if (role === "proprietaire") {
-        const [props, problems, expenses, documents] = await Promise.all([
+        const [props, problems, expenses, documents, recs] = await Promise.all([
           owner.properties(), owner.problems(), owner.expenses(), owner.documents(),
+          receipts.mine().catch(() => []),
         ]);
         const adapted = adaptProperties(props);
         // rattacher problèmes/dépenses à leur logement
@@ -180,6 +184,7 @@ export function useKerData() {
           ...d,
           properties: adapted,
           documents: documents || [],
+          receipts: recs || [],
           owner: { ...d.owner, onboarded: adapted.length > 0 },
         }));
       } else if (role === "gestionnaire") {
@@ -200,8 +205,9 @@ export function useKerData() {
             code: u.invite_code || "", leaseId: lease.id,
             payments: pays.length ? pays : mkHist(lease.rent_amount || 0, ["wait"]),
           };
+          const recs = await receipts.mine().catch(() => []);
           setDb((d) => ({
-            ...d, tenantLease: lease,
+            ...d, tenantLease: lease, receipts: recs || [],
             properties: [{ id: prop.id || "p_t", name: prop.name || "Mon logement", city: prop.city || "", district: "", units: [unit], problems: [], expenses: [] }],
           }));
         } else {
@@ -261,6 +267,7 @@ export function useKerData() {
     addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
     // --- Parcours locataire ---
     tenantLease: db.tenantLease || null,
+    receipts: db.receipts || [],
     findUnitByCode: async (code) => {
       if (!REAL) {
         const u = demoSeed().properties[0].units.find((x) => x.code.toUpperCase() === code.trim().toUpperCase());
