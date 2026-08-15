@@ -1,406 +1,268 @@
-/* KËR — useKerData
+/* KËR — Couche de données Supabase
    ------------------------------------------------------------------
-   Point d'entrée unique pour les données de l'app. Il bascule tout seul :
-   - MODE DÉMO  (clés Supabase absentes) : état local en mémoire, données §32.
-   - MODE RÉEL  (clés présentes)          : lit/écrit via data.js -> Supabase.
+   Remplace l'état local de démo par de vraies requêtes.
+   L'isolation par rôle est garantie par les policies RLS (fichier
+   001_schema.sql) : ces fonctions ne re-filtrent pas la sécurité,
+   elles s'appuient dessus. Une requête ne renverra JAMAIS les données
+   d'un autre utilisateur, même si le front se trompe.
 
-   L'app appelle toujours les mêmes fonctions (load, recordPayment,
-   reportProblem, addExpense, setExpenseStatus, setProblemStatus,
-   addDocument, completeOnboarding). Elle n'a pas à savoir quel mode
-   est actif : la bascule est invisible.
-
-   Installation :  placer ce fichier dans src/lib/ à côté de data.js.
-   Utilisation dans App.jsx :
-       const ker = useKerData();
-       ker.load();                       // au démarrage
-       await ker.recordPayment(unitId);  // etc.
+   Installation :  npm i @supabase/supabase-js
+   Variables .env : VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 */
-import { useCallback, useMemo, useRef, useState } from "react";
-import { auth, owner, manager, tenant, receipts, docs as docsApi } from "./data.js";
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
-const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
-export const REAL = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const url = import.meta.env.VITE_SUPABASE_URL;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-/* ---------- Données de démonstration (miroir de l'app, §32) ---------- */
-const MONTHS = ["Jan","Fev","Mar","Avr","Mai","Juin","Juil","Aout","Sep","Oct","Nov","Dec"];
-function mkHist(rent, statuses) {
-  const now = new Date();
-  return statuses.map((s, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (statuses.length - 1 - i), 1);
-    return {
-      period: MONTHS[d.getMonth()] + " " + d.getFullYear(),
-      amount: rent,
-      status: s === "late" ? "en_retard" : s === "wait" ? "en_attente" : "paye",
-      paid_at: s === "paye" ? "05/" + (d.getMonth() + 1) + "/" + d.getFullYear() : null,
-    };
-  });
-}
-function demoSeed() {
-  return {
-    owner: { full_name: "Ibrahima", onboarded: true },
-    manager: { full_name: "Cheikh" },
-    settings: { approval_threshold: 50000 },
-    properties: [{
-      id: "p1", name: "Immeuble Parcelles", type: "immeuble",
-      city: "Dakar", district: "Parcelles Assainies",
-      units: [
-        { id: "u1", label: "Appartement A", rent: 150000, due: 5, tenant: "Mamadou", code: "KER-45821",
-          payments: mkHist(150000, ["paye","paye","paye","late","paye","paye","paye","wait"]) },
-        { id: "u2", label: "Appartement B", rent: 150000, due: 5, tenant: "Awa", code: "KER-91043",
-          payments: mkHist(150000, ["paye","paye","paye","paye","paye","paye","paye","paye"]) },
-        { id: "u3", label: "Appartement C", rent: 150000, due: 5, tenant: "Fatou", code: "KER-33712",
-          payments: mkHist(150000, ["paye","paye","paye","paye","paye","paye","paye","paye"]) },
-        { id: "u4", label: "Appartement D", rent: 150000, due: 5, tenant: "Ousmane", code: "KER-58260",
-          payments: mkHist(150000, ["paye","paye","paye","paye","paye","late","late","late"]) },
-      ],
-      problems: [
-        { id: "m1", unitId: "u1", unit: "Appartement A", category: "Climatisation",
-          desc: "La climatisation ne fonctionne plus depuis hier.", status: "nouveau", by: "Mamadou" },
-        { id: "m2", unitId: "u4", unit: "Appartement D", category: "Plomberie",
-          desc: "Fuite sous l'evier de la cuisine.", status: "en_cours", by: "Ousmane" },
-      ],
-      expenses: [
-        { id: "e1", label: "Plomberie App. B", category: "Plomberie", amount: 25000, status: "auto_validee", by: "Cheikh" },
-        { id: "e2", label: "Reparation portail", category: "Menuiserie", amount: 50000, status: "auto_validee", by: "Cheikh" },
-        { id: "e3", label: "Peinture cage escalier", category: "Peinture", amount: 125000, status: "attente_validation", by: "Cheikh" },
-      ],
-    }],
-    documents: [
-      { id: "d1", category: "quittance", name: "Quittance Awa — dernier mois", unit: "Appartement B", date: "05/" + (new Date().getMonth() + 1) + "/" + new Date().getFullYear() },
-      { id: "d2", category: "contrat", name: "Bail Mamadou", unit: "Appartement A", date: "12/01/2024" },
-      { id: "d3", category: "facture", name: "Facture plomberie App. B", unit: "Appartement B", date: "02/" + (new Date().getMonth() + 1) + "/" + new Date().getFullYear() },
-    ],
-    receipts: [
-      { id: "r1", number: "KER-Q-2026-000001", tenant_name: "Awa", owner_name: "Ibrahima", property_name: "Immeuble Parcelles", unit_label: "Appartement B", period: "2026-07", amount: 150000, paid_at: "2026-07-05" },
-    ],
-  };
+export const supabase = createClient(url, key);
+
+/* Petit utilitaire : lève une erreur lisible, jamais un objet brut. */
+function ok({ data, error }) {
+  if (error) throw new Error(error.message || "Une erreur est survenue.");
+  return data;
 }
 
-/* ---------- Adaptation : forme Supabase -> forme attendue par l'app ---------- */
-/* L'app attend properties[].units[].payments[], problems[], expenses[].
-   Supabase renvoie units(leases(rent_payments)). On normalise ici pour que
-   les écrans n'aient aucune logique de mode. */
-function adaptProperties(rows) {
-  return (rows || []).map((p) => ({
-    id: p.id, name: p.name, type: p.type, city: p.city, district: p.district,
-    units: (p.units || []).map((u) => {
-      const lease = (u.leases || [])[0] || {};
-      const pays = (lease.rent_payments || []).map((r) => ({
-        period: r.period, amount: r.amount, status: r.status, paid_at: r.paid_at,
-      }));
-      return {
-        id: u.id, label: u.label, rent: u.rent_amount || lease.rent_amount || 0,
-        due: u.due_day || 5, tenant: lease.tenant_name || "—",
-        code: u.invite_code || "",
-        payments: pays.length ? pays : mkHist(u.rent_amount || 0, ["wait"]),
-      };
-    }),
-    problems: [], expenses: [],
-  }));
-}
+/* ---------------- AUTH ---------------- */
+export const auth = {
+  async updateProfile({ fullName, phone, country }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    const patch = {};
+    if (fullName !== undefined) patch.full_name = fullName;
+    if (phone !== undefined) patch.phone = phone;
+    if (country !== undefined) patch.country = country;
+    return ok(await supabase.from("profiles").update(patch).eq("id", user.id).select().single());
+  },
+  async signUp({ email, password, fullName, role = "proprietaire" }) {
+    return ok(await supabase.auth.signUp({
+      email, password,
+      options: { data: { full_name: fullName, role } },
+    }));
+  },
+  async signIn({ email, password }) {
+    return ok(await supabase.auth.signInWithPassword({ email, password }));
+  },
+  async signOut() { return ok(await supabase.auth.signOut()); },
+  async me() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const profile = ok(await supabase.from("profiles").select("*").eq("id", user.id).single());
+    return { ...user, profile };
+  },
+  onChange(cb) { return supabase.auth.onAuthStateChange((_e, s) => cb(s)); },
+};
 
-/* ================================================================== */
-export function useKerData() {
-  const [db, setDb] = useState(demoSeed);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const roleRef = useRef(null); // rôle courant en mode réel
+/* ---------------- PROPRIÉTAIRE ---------------- */
+export const owner = {
+  // Patrimoine complet en une lecture (RLS filtre sur owner_id = auth.uid()).
+  async properties() {
+    return ok(await supabase
+      .from("properties")
+      .select("*, units(*, leases(*, rent_payments(*)))")
+      .order("created_at", { ascending: true }));
+  },
+  async addProperty(p) {
+    const { data: { user } } = await supabase.auth.getUser();
+    return ok(await supabase.from("properties").insert({ ...p, owner_id: user.id }).select().single());
+  },
+  async addUnit(propertyId, u) {
+    return ok(await supabase.from("units").insert({ ...u, property_id: propertyId }).select().single());
+  },
+  // S'assurer qu'un bail actif existe pour cette unité (en crée un si besoin).
+  async ensureLease(unitId, rentAmount) {
+    const existing = await supabase.from("leases").select("id").eq("unit_id", unitId).eq("active", true).maybeSingle();
+    if (existing.data && existing.data.id) return existing.data.id;
+    const created = ok(await supabase.from("leases").insert({
+      unit_id: unitId, rent_amount: rentAmount || 0, active: true,
+    }).select().single());
+    return created.id;
+  },
+  // Enregistrer un paiement pour une unité (crée le bail à la volée si nécessaire).
+  async recordPaymentForUnit(unitId, rentAmount) {
+    const leaseId = await this.ensureLease(unitId, rentAmount);
+    const now = new Date();
+    const period = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    return ok(await supabase.from("rent_payments").insert({
+      lease_id: leaseId, period, amount: rentAmount || 0, status: "paye", method: "autre",
+      paid_at: now.toISOString().slice(0, 10),
+    }).select().single());
+  },
+  async problems() {
+    return ok(await supabase.from("maintenance_requests").select("*, units(label, property_id)").order("created_at", { ascending: false }));
+  },
+  async setProblemStatus(id, status) {
+    return ok(await supabase.from("maintenance_requests").update({ status }).eq("id", id).select().single());
+  },
+  async expenses() {
+    return ok(await supabase.from("expenses").select("*").order("created_at", { ascending: false }));
+  },
+  async setExpenseStatus(id, status) {
+    return ok(await supabase.from("expenses").update({ status }).eq("id", id).select().single());
+  },
+  async documents() {
+    return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
+  },
+  // Invitation : le "code" est le lease.id encodé ; ici on renvoie le bail cible.
+  async createInvite(leaseId) {
+    return ok(await supabase.from("leases").select("id, unit_id, units(label)").eq("id", leaseId).single());
+  },
+};
 
-  /* ----- MODE DÉMO : mutations locales (identiques à l'app actuelle) ----- */
-  const demo = useMemo(() => ({
-    recordPayment: (unitId) => setDb((d) => {
-      const nd = structuredClone(d);
-      const u = nd.properties.flatMap((p) => p.units).find((x) => x.id === unitId);
-      const last = u.payments[u.payments.length - 1];
-      last.status = "paye"; last.paid_at = new Date().toLocaleDateString("fr-FR");
-      return nd;
-    }),
-    addProblem: (unitId, category, desc) => setDb((d) => {
-      const nd = structuredClone(d);
-      const prop = nd.properties.find((p) => p.units.some((u) => u.id === unitId));
-      const u = prop.units.find((x) => x.id === unitId);
-      prop.problems.unshift({ id: "m" + Date.now(), unitId, unit: u.label, category, desc, status: "nouveau", by: u.tenant });
-      return nd;
-    }),
-    setProblemStatus: (id, status) => setDb((d) => {
-      const nd = structuredClone(d);
-      nd.properties.forEach((p) => p.problems.forEach((m) => { if (m.id === id) m.status = status; }));
-      return nd;
-    }),
-    addExpense: (propId, label, category, amount, by) => setDb((d) => {
-      const nd = structuredClone(d);
-      const prop = nd.properties.find((p) => p.id === propId);
-      const status = amount > nd.settings.approval_threshold ? "attente_validation" : "auto_validee";
-      prop.expenses.unshift({ id: "e" + Date.now(), label, category, amount, status, by });
-      return nd;
-    }),
-    setExpenseStatus: (propId, id, status) => setDb((d) => {
-      const nd = structuredClone(d);
-      const prop = nd.properties.find((p) => p.id === propId);
-      prop.expenses.forEach((e) => { if (e.id === id) e.status = status; });
-      return nd;
-    }),
-    setThreshold: (value) => setDb((d) => ({ ...d, settings: { ...d.settings, approval_threshold: value } })),
-    addDocument: (doc) => setDb((d) => ({ ...d, documents: [{ id: "d" + Date.now(), ...doc }, ...(d.documents || [])] })),
-    completeOnboarding: (payload) => setDb((d) => {
-      const nd = structuredClone(d);
-      nd.owner.onboarded = true;
-      if (payload?.propertyName) {
-        nd.properties.push({
-          id: "p" + Date.now(), name: payload.propertyName, type: payload.type || "appartement",
-          city: payload.city || "", district: payload.district || "",
-          units: [{ id: "u" + Date.now(), label: payload.unitLabel || "Logement 1", rent: payload.rent || 0, due: 5,
-            tenant: payload.tenant || "Locataire", code: "KER-" + Math.floor(10000 + Math.random() * 89999),
-            payments: mkHist(payload.rent || 0, ["wait"]) }],
-          problems: [], expenses: [],
-        });
-      }
-      return nd;
-    }),
-  }), []);
+/* ---------------- GESTIONNAIRE ---------------- */
+export const manager = {
+  // RLS ne renvoie que les biens présents dans property_managers pour ce gestionnaire.
+  async properties() {
+    return ok(await supabase.from("properties").select("*, units(*)").order("created_at", { ascending: true }));
+  },
+  // Le statut (auto_validee / attente_validation) est décidé par un trigger SQL
+  // selon settings.approval_threshold — le front n'a pas à en décider (§11).
+  async addExpense(propertyId, e) {
+    const { data: { user } } = await supabase.auth.getUser();
+    return ok(await supabase.from("expenses")
+      .insert({ ...e, property_id: propertyId, created_by: user.id })
+      .select().single());
+  },
+  async setProblemStatus(id, status) {
+    return ok(await supabase.from("maintenance_requests").update({ status }).eq("id", id).select().single());
+  },
+};
 
-  /* ----- Chargement initial ----- */
-  const load = useCallback(async (role) => {
-    if (!REAL) return; // en démo, le seed est déjà là
-    roleRef.current = role;
-    setLoading(true); setError(null);
-    try {
-      if (role === "proprietaire") {
-        const [props, problems, expenses, documents, recs, meProf] = await Promise.all([
-          owner.properties(), owner.problems(), owner.expenses(), owner.documents(),
-          receipts.mine().catch(() => []),
-          auth.me().catch(() => null),
-        ]);
-        const adapted = adaptProperties(props);
-        // rattacher problèmes/dépenses à leur logement
-        adapted.forEach((p) => {
-          p.problems = (problems || []).filter((m) => m.units?.property_id === p.id)
-            .map((m) => ({ id: m.id, unitId: m.unit_id, unit: m.units?.label, category: m.category, desc: m.description, status: m.status, by: "—", photos: m.photo_urls || (m.photo_url ? [m.photo_url] : []) }));
-          p.expenses = (expenses || []).filter((e) => e.property_id === p.id)
-            .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—" }));
-        });
-        // En réel : un propriétaire sans aucun logement doit passer par l'onboarding.
-        const prof = (meProf && meProf.profile) || {};
-        setDb((d) => ({
-          ...d,
-          properties: adapted,
-          documents: documents || [],
-          receipts: recs || [],
-          owner: { ...d.owner, onboarded: adapted.length > 0,
-                   full_name: prof.full_name || d.owner.full_name,
-                   phone: prof.phone || d.owner.phone || "" },
-        }));
-      } else if (role === "gestionnaire") {
-        const props = await manager.properties();
-        setDb((d) => ({ ...d, properties: adaptProperties(props) }));
-      } else if (role === "locataire") {
-        const lease = await tenant.myLease();
-        if (lease && lease.units) {
-          const u = lease.units;
-          const prop = u.properties || {};
-          const pays = (lease.rent_payments || []).map((r) => ({
-            period: r.period, amount: r.amount, status: r.status, paid_at: r.paid_at,
-          }));
-          // On fabrique une "propriété" à une unité, pour réutiliser l'écran locataire.
-          const unit = {
-            id: u.id, label: u.label, rent: lease.rent_amount || u.rent_amount || 0,
-            due: lease.due_day || u.due_day || 5, tenant: "Vous",
-            code: u.invite_code || "", leaseId: lease.id,
-            payments: pays.length ? pays : mkHist(lease.rent_amount || 0, ["wait"]),
-          };
-          const recs = await receipts.mine().catch(() => []);
-          const ownerContact = await tenant.ownerContact().catch(() => null);
-          setDb((d) => ({
-            ...d, tenantLease: lease, receipts: recs || [], ownerContact: ownerContact,
-            properties: [{ id: prop.id || "p_t", name: prop.name || "Mon logement", city: prop.city || "", district: "", units: [unit], problems: [], expenses: [] }],
-          }));
-        } else {
-          setDb((d) => ({ ...d, tenantLease: null }));
-        }
-      }
-    } catch (e) {
-      setError(e.message || "Impossible de charger les données.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+/* ---------------- LOCATAIRE ---------------- */
+export const tenant = {
+  // RLS ne renvoie que le bail dont tenant_id = auth.uid().
+  async myLease() {
+    return ok(await supabase
+      .from("leases")
+      .select("*, units(*, properties(name, city)), rent_payments(*)")
+      .eq("active", true)
+      .maybeSingle());
+  },
+  // Enregistrer un paiement = insérer une ligne (jamais un vrai débit — §7).
+  async recordPayment(leaseId, { period, amount, method = "autre", note }) {
+    return ok(await supabase.from("rent_payments").insert({
+      lease_id: leaseId, period, amount, method, status: "paye",
+      paid_at: new Date().toISOString().slice(0, 10), note,
+    }).select().single());
+  },
+  async reportProblem(unitId, { category, description, photoUrls }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    const paths = photoUrls || [];
+    return ok(await supabase.from("maintenance_requests").insert({
+      unit_id: unitId, reported_by: user.id, category, description,
+      photo_url: paths[0] || null, photo_urls: paths, status: "nouveau",
+    }).select().single());
+  },
+  // Uploade une photo de problème dans le bucket "documents", renvoie le chemin.
+  async uploadProblemPhoto(file) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    const safe = (file.name || "photo.jpg").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/problemes/" + Date.now() + "-" + safe;
+    const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    return data.path;
+  },
+  // Lien signé pour afficher une photo de problème
+  async photoUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
+    if (error) return null;
+    return data.signedUrl;
+  },
+  // Contact du propriétaire du logement du locataire connecté (nom, téléphone).
+  async ownerContact() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    // via son bail actif -> unité -> logement -> propriétaire
+    const lease = ok(await supabase
+      .from("leases")
+      .select("units(properties(owner_id))")
+      .eq("tenant_id", user.id).eq("active", true).maybeSingle());
+    const ownerId = lease && lease.units && lease.units.properties && lease.units.properties.owner_id;
+    if (!ownerId) return null;
+    const prof = ok(await supabase.from("profiles").select("full_name, phone").eq("id", ownerId).single());
+    return { name: prof.full_name, phone: prof.phone || null };
+  },
+  async myDocuments() {
+    return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
+  },
+  // Valider un code d'invitation (renvoie l'unité correspondante, ou null).
+  async findUnitByCode(code) {
+    const { data, error } = await supabase.rpc("find_unit_by_code", { p_code: code });
+    if (error) throw new Error(error.message);
+    return (data && data[0]) || null;
+  },
+  // Rejoindre une unité via un code : crée le bail et renvoie son id.
+  async joinWithCode(code, fullName) {
+    const { data, error } = await supabase.rpc("join_unit_with_code", { p_code: code, p_full_name: fullName || null });
+    if (error) throw new Error(error.message);
+    return data; // lease id
+  },
+};
 
-  /* ----- Actions : réel si branché, sinon démo. Toujours re-synchronise. ----- */
-  const wrap = (realFn, demoFn) => async (...args) => {
-    if (!REAL) return demoFn(...args);
-    setError(null);
-    try {
-      await realFn(...args);
-      await load(roleRef.current); // relire pour refléter les triggers SQL
-    } catch (e) {
-      setError(e.message || "L'action a échoué. Réessayez.");
-    }
-  };
+/* ---------------- OWNER : code d'invitation d'une unité ---------------- */
+owner.unitInviteCode = async function (unitId) {
+  const { data, error } = await supabase.from("units").select("invite_code").eq("id", unitId).single();
+  if (error) throw new Error(error.message);
+  return data.invite_code;
+};
 
-  const api = {
-    db, loading, error, REAL,
-    load,
-    recordPayment: async (unitId, rentAmount, leaseId) => {
-      if (!REAL) return demo.recordPayment(unitId);
-      setError(null);
-      try {
-        if (roleRef.current === "locataire" && leaseId) {
-          const now = new Date();
-          const period = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-          await tenant.recordPayment(leaseId, { period, amount: rentAmount || 0 });
-          await load("locataire");
-        } else {
-          await owner.recordPaymentForUnit(unitId, rentAmount || 0);
-          await load(roleRef.current || "proprietaire");
-        }
-      } catch (e) { setError(e.message || "Enregistrement du paiement impossible."); }
-    },
-    reportProblem: wrap(
-      (unitId, category, description, photoUrls) => tenant.reportProblem(unitId, { category, description, photoUrls }),
-      demo.addProblem),
-    // Uploader une photo de problème, renvoie son chemin (réel) ou null (démo)
-    uploadProblemPhoto: async (file) => {
-      if (!REAL) return null;
-      try { return await tenant.uploadProblemPhoto(file); } catch (e) { setError(e.message || "Envoi de la photo impossible."); return null; }
-    },
-    photoUrl: async (path) => {
-      if (!REAL || !path) return null;
-      try { return await tenant.photoUrl(path); } catch (e) { return null; }
-    },
-    setProblemStatus: wrap(
-      (id, status) => owner.setProblemStatus(id, status),
-      demo.setProblemStatus),
-    addExpense: wrap(
-      (propId, label, category, amount) => manager.addExpense(propId, { description: label, category, amount }),
-      demo.addExpense),
-    setExpenseStatus: wrap(
-      (propId, id, status) => owner.setExpenseStatus(id, status),
-      demo.setExpenseStatus),
-    setThreshold: demo.setThreshold,     // réglage : local suffit (réel : table settings)
-    addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
-    // --- Profil (nom, téléphone) ---
-    updateProfile: async (patch) => {
-      if (!REAL) { setDb((d) => ({ ...d, owner: { ...d.owner, ...(patch.fullName ? { full_name: patch.fullName } : {}), ...(patch.phone ? { phone: patch.phone } : {}) } })); return; }
-      setError(null);
-      try {
-        await auth.updateProfile(patch);
-        setDb((d) => ({ ...d, owner: { ...d.owner, full_name: patch.fullName ?? d.owner.full_name, phone: patch.phone ?? d.owner.phone } }));
-      } catch (e) { setError(e.message || "Mise à jour du profil impossible."); throw e; }
-    },
-    // --- Documents (upload/consultation/suppression réels) ---
-    uploadDocument: async (file, meta) => {
-      if (!REAL) {
-        // démo : on ajoute juste une entrée locale
-        setDb((d) => ({ ...d, documents: [{ id: "d" + Date.now(), category: meta.category || "autre", name: meta.name || file.name, date: new Date().toLocaleDateString("fr-FR") }, ...(d.documents || [])] }));
-        return;
-      }
-      setError(null);
-      try {
-        await docsApi.add(file, meta);
-        const list = await docsApi.list();
-        setDb((d) => ({ ...d, documents: list || [] }));
-      } catch (e) { setError(e.message || "Envoi du document impossible."); throw e; }
-    },
-    openDocument: async (fileUrl) => {
-      if (!REAL || !fileUrl) return null;
-      try { return await docsApi.open(fileUrl); } catch (e) { setError(e.message || "Ouverture impossible."); return null; }
-    },
-    deleteDocument: async (id, fileUrl) => {
-      if (!REAL) { setDb((d) => ({ ...d, documents: (d.documents || []).filter((x) => x.id !== id) })); return; }
-      setError(null);
-      try {
-        await docsApi.remove(id, fileUrl);
-        const list = await docsApi.list();
-        setDb((d) => ({ ...d, documents: list || [] }));
-      } catch (e) { setError(e.message || "Suppression impossible."); }
-    },
-    // --- Parcours locataire ---
-    tenantLease: db.tenantLease || null,
-    receipts: db.receipts || [],
-    findUnitByCode: async (code) => {
-      if (!REAL) {
-        const u = demoSeed().properties[0].units.find((x) => x.code.toUpperCase() === code.trim().toUpperCase());
-        return u ? { unit_label: u.label, property_name: "Immeuble Parcelles", rent: u.rent } : null;
-      }
-      return tenant.findUnitByCode(code);
-    },
-    joinWithCode: async (code, fullName) => {
-      if (!REAL) { await load("locataire"); return "demo"; }
-      setError(null);
-      const leaseId = await tenant.joinWithCode(code, fullName); // peut throw → géré par l'appelant
-      await load("locataire");
-      return leaseId;
-    },
-    // Code d'invitation réel d'une unité (pour l'écran "Inviter le locataire")
-    inviteCode: async (unitId, fallback) => {
-      if (!REAL) return fallback || "";
-      try { return await owner.unitInviteCode(unitId); } catch (e) { return fallback || ""; }
-    },
-    addProperty: async (p) => {
-      if (!REAL) {
-        setDb((d) => {
-          const nd = structuredClone(d);
-          nd.properties.push({
-            id: "p" + Date.now(), name: p.name, type: p.type || "appartement",
-            city: p.city || "", district: p.district || "",
-            units: [], problems: [], expenses: [],
-          });
-          return nd;
-        });
-        return;
-      }
-      setError(null);
-      try {
-        const prop = await owner.addProperty({ name: p.name, type: p.type || "appartement", city: p.city || "", district: p.district || "" });
-        if (p.unitLabel) {
-          await owner.addUnit(prop.id, { label: p.unitLabel, rent_amount: p.rent || 0, due_day: 5 });
-        }
-        await load("proprietaire");
-      } catch (e) { setError(e.message || "Création du logement impossible."); }
-    },
-    // Ajouter un appartement/unité à un logement existant
-    addUnit: async (propId, u) => {
-      if (!REAL) {
-        setDb((d) => {
-          const nd = structuredClone(d);
-          const prop = nd.properties.find((x) => x.id === propId);
-          if (prop) prop.units.push({ id: "u" + Date.now(), label: u.label, rent: u.rent || 0, due: 5, tenant: "—", code: "KER-" + Math.floor(10000 + Math.random() * 89999), payments: mkHist(u.rent || 0, ["wait"]) });
-          return nd;
-        });
-        return;
-      }
-      setError(null);
-      try {
-        await owner.addUnit(propId, { label: u.label, rent_amount: u.rent || 0, due_day: 5 });
-        await load("proprietaire");
-      } catch (e) { setError(e.message || "Ajout de l'appartement impossible."); }
-    },
-    completeOnboarding: async (payload) => {
-      if (!REAL) return demo.completeOnboarding(payload);
-      setError(null);
-      try {
-        if (payload && payload.propertyName) {
-          const prop = await owner.addProperty({
-            name: payload.propertyName,
-            type: payload.type || "appartement",
-            city: payload.city || "",
-            district: payload.district || "",
-          });
-          await owner.addUnit(prop.id, {
-            label: payload.unitLabel || "Logement 1",
-            rent_amount: payload.rent || 0,
-            due_day: 5,
-          });
-        }
-        // marquer le profil comme onboardé (localement, pour sortir de l'écran d'onboarding)
-        setDb((d) => ({ ...d, owner: { ...d.owner, onboarded: true } }));
-        await load("proprietaire");
-      } catch (e) {
-        setError(e.message || "La création du logement a échoué.");
-      }
-    },
-  };
+/* ---------------- QUITTANCES (preuves de paiement) ---------------- */
+export const receipts = {
+  // Toutes les quittances qui me concernent (RLS filtre : mes quittances locataire OU proprio)
+  async mine() {
+    return ok(await supabase.from("receipts").select("*").order("created_at", { ascending: false }));
+  },
+};
 
-  return api;
-}
+/* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
+export const storage = {
+  // Bucket privé "documents". Chemin = {user_id}/{timestamp}-{nom}
+  async upload(path, file) {
+    const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    return data.path;
+  },
+  async signedUrl(path, seconds = 3600) {
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, seconds);
+    if (error) throw new Error(error.message);
+    return data.signedUrl;
+  },
+  async remove(path) {
+    const { error } = await supabase.storage.from("documents").remove([path]);
+    if (error) throw new Error(error.message);
+    return true;
+  },
+};
+
+/* ---------------- DOCUMENTS (gestion complète) ---------------- */
+export const docs = {
+  // Uploade un fichier + crée la ligne en base. Renvoie le document créé.
+  async add(file, { category = "autre", name, propertyId = null, unitId = null }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    // chemin unique dans le bucket, préfixé par l'id user (isolation)
+    const safeName = (name || file.name || "fichier").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/" + Date.now() + "-" + safeName;
+    await storage.upload(path, file);
+    const row = ok(await supabase.from("documents").insert({
+      owner_id: user.id, property_id: propertyId, unit_id: unitId,
+      category, name: name || file.name, file_url: path,
+    }).select().single());
+    return row;
+  },
+  // Liste mes documents (RLS filtre selon le rôle)
+  async list() {
+    return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
+  },
+  // Lien signé temporaire pour consulter/télécharger
+  async open(fileUrl) {
+    return storage.signedUrl(fileUrl, 3600);
+  },
+  // Supprime le fichier + la ligne
+  async remove(id, fileUrl) {
+    if (fileUrl) { try { await storage.remove(fileUrl); } catch (e) {} }
+    ok(await supabase.from("documents").delete().eq("id", id));
+    return true;
+  },
+};
