@@ -212,7 +212,7 @@ export default function KerApp() {
   const db = ker.db;
   const session = sessionState;
 
-  const recordPayment = (unitId, rent) => ker.recordPayment(unitId, rent);
+  const recordPayment = (unitId, rent, leaseId) => ker.recordPayment(unitId, rent, leaseId);
   const addProblem = (unitId, category, desc) => ker.reportProblem(unitId, category, desc);
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
   const addExpense = (propId, label, category, amount, by) => ker.addExpense(propId, label, category, amount, by);
@@ -222,6 +222,8 @@ export default function KerApp() {
   const addProperty = (p) => ker.addProperty(p);
   const addUnit = (propId, u) => ker.addUnit(propId, u);
   const completeOnboarding = (payload) => ker.completeOnboarding(payload);
+  const joinWithCode = (code, fullName) => ker.joinWithCode(code, fullName);
+  const findUnitByCode = (code) => ker.findUnitByCode(code);
 
   // Sélection d'un espace : mémorise la session ET déclenche le chargement réel.
   const setSession = (s) => {
@@ -267,7 +269,91 @@ export default function KerApp() {
       onAddProperty={addProperty} onAddUnit={addUnit} logout={handleLogout} />;
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={handleLogout} />;
-  return <TenantApp db={db} unitId={session.unitId} onRecord={recordPayment} onAddProblem={addProblem} logout={handleLogout} />;
+  // Locataire en mode réel : s'il n'a pas encore de bail, on lui demande son code.
+  if (session.role === "locataire" && REAL && !ker.tenantLease) {
+    return <JoinScreen onJoin={joinWithCode} onFind={findUnitByCode}
+      defaultName={(authUser && authUser.profile && authUser.profile.full_name) || ""} logout={handleLogout} />;
+  }
+  {
+    // Unité à afficher pour le locataire : en réel, la première (unique) chargée.
+    const tenantUnitId = session.unitId || (db.properties[0] && db.properties[0].units[0] && db.properties[0].units[0].id);
+    return <TenantApp db={db} unitId={tenantUnitId} onRecord={recordPayment} onAddProblem={addProblem} logout={handleLogout} />;
+  }
+}
+
+/* Écran locataire : rejoindre son logement avec un code d'invitation */
+function JoinScreen({ onJoin, onFind, defaultName, logout }) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState(defaultName || "");
+  const [found, setFound] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState(null);
+
+  const check = async () => {
+    setError(null); setFound(null);
+    if (!code.trim()) return;
+    setChecking(true);
+    try {
+      const u = await onFind(code.trim());
+      if (u) setFound(u);
+      else setError("Ce code ne correspond à aucun logement.");
+    } catch (e) { setError("Impossible de vérifier le code."); }
+    finally { setChecking(false); }
+  };
+
+  const join = async () => {
+    setError(null); setJoining(true);
+    try {
+      await onJoin(code.trim(), name.trim());
+      // le chargement du bail se fait dans le hook ; l'app basculera vers l'espace locataire
+    } catch (e) {
+      setError((e && e.message) || "Impossible de rejoindre ce logement.");
+      setJoining(false);
+    }
+  };
+
+  return (
+    <Shell>
+      <div style={{ paddingTop: 40, textAlign: "center" }}>
+        <KerMark size={54} />
+        <div style={{ fontSize: 22, fontWeight: 800, marginTop: 12 }}>Rejoindre mon logement</div>
+        <div style={{ fontSize: 14, color: T.mut, marginTop: 6 }}>Entrez le code d'invitation communiqué par votre propriétaire.</div>
+      </div>
+      <div style={{ marginTop: 24, display: "grid", gap: 12 }}>
+        <div>
+          <div style={fieldLabel}>Votre nom</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Mamadou Diop" style={fieldInput} />
+        </div>
+        <div>
+          <div style={fieldLabel}>Code d'invitation</div>
+          <input value={code} onChange={(e) => { setCode(e.target.value); setFound(null); }} placeholder="KER-45821"
+            style={{ ...fieldInput, letterSpacing: "0.08em", textTransform: "uppercase" }} />
+        </div>
+
+        {!found && (
+          <button onClick={check} disabled={checking || !code.trim()} style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: (checking || !code.trim()) ? 0.5 : 1 }}>
+            {checking ? "Vérification…" : "Vérifier le code"}
+          </button>
+        )}
+
+        {found && (
+          <div style={{ background: T.tealSoft, borderRadius: 14, padding: 16 }}>
+            <div style={{ fontSize: 13, color: T.mut }}>Logement trouvé</div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginTop: 2 }}>{found.unit_label} · {found.property_name}</div>
+            <div style={{ fontSize: 14, color: T.teal, fontWeight: 700, marginTop: 4 }}>{fcfa(found.rent)} / mois</div>
+            <button onClick={join} disabled={joining} style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: 14, marginTop: 12, opacity: joining ? 0.6 : 1 }}>
+              {joining ? "Un instant…" : "Rejoindre ce logement"}
+            </button>
+          </div>
+        )}
+
+        {error && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{error}</div>}
+
+        <button onClick={logout} style={{ ...ghostBtn, justifyContent: "center", padding: 12, marginTop: 4 }}>Se déconnecter</button>
+      </div>
+    </Shell>
+  );
 }
 
 function RolePicker({ onPick, db }) {
@@ -804,7 +890,7 @@ function TenantApp({ db, unitId, onRecord, onAddProblem, logout }) {
         </div>
         <div style={{ fontSize: 13, color: T.mut, margin: "20px 0 10px", fontWeight: 600 }}>ACTIONS</div>
         <div style={{ display: "grid", gap: 10 }}>
-          {last.status !== "paye" && <BigButton icon={Wallet} label="Enregistrer mon paiement" sub={fcfa(unit.rent)} tint={T.paid} onClick={() => onRecord(unitId)} />}
+          {last.status !== "paye" && <BigButton icon={Wallet} label="Enregistrer mon paiement" sub={fcfa(unit.rent)} tint={T.paid} onClick={() => onRecord(unitId, unit.rent, unit.leaseId)} />}
           <BigButton icon={Wrench} label="Signaler un probleme" sub="Eau, electricite, plomberie..." tint={T.late} onClick={() => setScreen("report")} />
           <BigButton icon={FileText} label="Mes documents" sub="Quittances & contrat" tint={T.teal} onClick={() => {}} />
           <BigButton icon={MessageCircle} label="Contacter le proprietaire" sub={db.owner.full_name} tint={T.sun} onClick={() => {}} />
@@ -874,19 +960,17 @@ function ReportProblem({ unit, back, onSubmit }) {
 
 function InviteModal({ unit, close }) {
   const [copied, setCopied] = useState(false);
-  const link = "https://ker.app/rejoindre/" + unit.code;
-  const copy = () => { try { navigator.clipboard.writeText(link); } catch (e) {} setCopied(true); setTimeout(() => setCopied(false), 1600); };
+  const copy = () => { try { navigator.clipboard.writeText(unit.code); } catch (e) {} setCopied(true); setTimeout(() => setCopied(false), 1600); };
   return (
     <Sheet close={close} title={"Inviter · " + unit.label}>
       <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
-        <div style={{ fontSize: 13, color: T.mut }}>Code d'invitation de {unit.tenant}</div>
+        <div style={{ fontSize: 13, color: T.mut }}>Code d'invitation</div>
         <div style={{ fontFamily: "'Fraunces', serif", fontSize: 34, fontWeight: 700, color: T.teal, letterSpacing: "0.04em", margin: "6px 0" }}>{unit.code}</div>
       </div>
-      <div style={{ background: T.paper, borderRadius: 12, padding: "12px 14px", fontSize: 13, color: T.mut, wordBreak: "break-all" }}>{link}</div>
       <button onClick={copy} style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 12, padding: 14 }}>
-        {copied ? <><Check size={16} /> Copie</> : <><Copy size={16} /> Copier le lien</>}
+        {copied ? <><Check size={16} /> Copié</> : <><Copy size={16} /> Copier le code</>}
       </button>
-      <div style={{ fontSize: 12.5, color: T.mut, marginTop: 10, textAlign: "center" }}>Le locataire ouvre le lien, cree son compte, et est rattache automatiquement a {unit.label}.</div>
+      <div style={{ fontSize: 12.5, color: T.mut, marginTop: 10, textAlign: "center" }}>Communiquez ce code à votre locataire. Il crée un compte « Locataire », entre ce code, et est rattaché automatiquement à {unit.label}.</div>
     </Sheet>
   );
 }
