@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from "react";
-import { useKerData } from "./lib/useKerData.js";
+import React, { useState, useMemo, useEffect } from "react";
+import { useKerData, REAL } from "./lib/useKerData.js";
+import AuthScreen from "./lib/AuthScreen.jsx";
+import { auth as supaAuth } from "./lib/data.js";
 import {
   Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, Building2,
   CircleDot, ArrowRight, X, FileText, Download, Users,
@@ -18,9 +20,8 @@ import {
    Renseignez SUPABASE_URL / SUPABASE_ANON_KEY pour passer en reel.
    Sinon -> MODE DEMO (donnees §32), sans jamais simuler de paiement reel.
    ============================================================ */
-const SUPABASE_URL = "";
-const SUPABASE_ANON_KEY = "";
-const DEMO = !SUPABASE_URL || !SUPABASE_ANON_KEY;
+// Le vrai mode est déterminé dans useKerData.js (REAL). DEMO = son inverse.
+const DEMO = !REAL;
 
 /* Palette KËR — vert profond + doré (identité de marque).
    Les noms de tokens restent (teal/sun) mais portent les couleurs KËR. */
@@ -193,6 +194,18 @@ function buildMonthlyReport(properties) {
 export default function KerApp() {
   const [sessionState, setSessionState] = useState(null);
 
+  // Authentification réelle (Supabase). En mode démo, on ne s'en sert pas.
+  const [authUser, setAuthUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(!REAL); // en démo, rien à vérifier
+
+  useEffect(() => {
+    if (!REAL) return;
+    let alive = true;
+    supaAuth.me().then((me) => { if (alive) { setAuthUser(me); setAuthChecked(true); } })
+      .catch(() => { if (alive) setAuthChecked(true); });
+    return () => { alive = false; };
+  }, []);
+
   // Source de données unique : démo si pas de clés Supabase, réel sinon.
   // Voir src/lib/useKerData.js — l'app appelle les mêmes fonctions dans les deux cas.
   const ker = useKerData();
@@ -214,15 +227,44 @@ export default function KerApp() {
     if (s && s.role) ker.load(s.role);
   };
 
+  // Déconnexion : en réel, on ferme la session Supabase et on revient à l'écran de connexion.
+  const handleLogout = async () => {
+    if (REAL) {
+      try { await supaAuth.signOut(); } catch (e) {}
+      setAuthUser(null);
+    }
+    setSessionState(null);
+  };
+
+  // --- Mode réel : exiger une connexion avant tout ---
+  if (REAL) {
+    if (!authChecked) {
+      return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#F7F4EC", color: "#5E6B66", fontFamily: "system-ui" }}>Chargement…</div>;
+    }
+    if (!authUser) {
+      return <AuthScreen onAuthenticated={(me) => {
+        setAuthUser(me);
+        const r = (me && me.profile && me.profile.role) || "proprietaire";
+        setSession({ role: r });
+      }} />;
+    }
+    // connecté mais session pas encore posée (ex: rechargement de page)
+    if (!session) {
+      const r = (authUser.profile && authUser.profile.role) || "proprietaire";
+      setSession({ role: r });
+      return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#F7F4EC", color: "#5E6B66", fontFamily: "system-ui" }}>Chargement…</div>;
+    }
+  }
+
   if (!session) return <RolePicker onPick={setSession} db={db} />;
   if (session.role === "proprietaire" && !db.owner.onboarded)
-    return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={() => setSession(null)} />;
+    return <Onboarding owner={db.owner} onDone={completeOnboarding} logout={handleLogout} />;
   if (session.role === "proprietaire")
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus}
-      onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument} logout={() => setSession(null)} />;
+      onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument} logout={handleLogout} />;
   if (session.role === "gestionnaire")
-    return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={() => setSession(null)} />;
-  return <TenantApp db={db} unitId={session.unitId} onRecord={recordPayment} onAddProblem={addProblem} logout={() => setSession(null)} />;
+    return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={handleLogout} />;
+  return <TenantApp db={db} unitId={session.unitId} onRecord={recordPayment} onAddProblem={addProblem} logout={handleLogout} />;
 }
 
 function RolePicker({ onPick, db }) {
