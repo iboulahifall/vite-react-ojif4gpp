@@ -16,7 +16,7 @@
        await ker.recordPayment(unitId);  // etc.
 */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { auth, owner, manager, tenant, receipts } from "./data.js";
+import { auth, owner, manager, tenant, receipts, docs as docsApi } from "./data.js";
 
 const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || "";
@@ -265,6 +265,33 @@ export function useKerData() {
       demo.setExpenseStatus),
     setThreshold: demo.setThreshold,     // réglage : local suffit (réel : table settings)
     addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
+    // --- Documents (upload/consultation/suppression réels) ---
+    uploadDocument: async (file, meta) => {
+      if (!REAL) {
+        // démo : on ajoute juste une entrée locale
+        setDb((d) => ({ ...d, documents: [{ id: "d" + Date.now(), category: meta.category || "autre", name: meta.name || file.name, date: new Date().toLocaleDateString("fr-FR") }, ...(d.documents || [])] }));
+        return;
+      }
+      setError(null);
+      try {
+        await docsApi.add(file, meta);
+        const list = await docsApi.list();
+        setDb((d) => ({ ...d, documents: list || [] }));
+      } catch (e) { setError(e.message || "Envoi du document impossible."); throw e; }
+    },
+    openDocument: async (fileUrl) => {
+      if (!REAL || !fileUrl) return null;
+      try { return await docsApi.open(fileUrl); } catch (e) { setError(e.message || "Ouverture impossible."); return null; }
+    },
+    deleteDocument: async (id, fileUrl) => {
+      if (!REAL) { setDb((d) => ({ ...d, documents: (d.documents || []).filter((x) => x.id !== id) })); return; }
+      setError(null);
+      try {
+        await docsApi.remove(id, fileUrl);
+        const list = await docsApi.list();
+        setDb((d) => ({ ...d, documents: list || [] }));
+      } catch (e) { setError(e.message || "Suppression impossible."); }
+    },
     // --- Parcours locataire ---
     tenantLease: db.tenantLease || null,
     receipts: db.receipts || [],
