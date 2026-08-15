@@ -174,7 +174,13 @@ export function useKerData() {
           p.expenses = (expenses || []).filter((e) => e.property_id === p.id)
             .map((e) => ({ id: e.id, label: e.description || e.category, category: e.category, amount: e.amount, status: e.status, by: "—" }));
         });
-        setDb((d) => ({ ...d, properties: adapted, documents: documents || [] }));
+        // En réel : un propriétaire sans aucun logement doit passer par l'onboarding.
+        setDb((d) => ({
+          ...d,
+          properties: adapted,
+          documents: documents || [],
+          owner: { ...d.owner, onboarded: adapted.length > 0 },
+        }));
       } else if (role === "gestionnaire") {
         const props = await manager.properties();
         setDb((d) => ({ ...d, properties: adaptProperties(props) }));
@@ -222,7 +228,30 @@ export function useKerData() {
       demo.setExpenseStatus),
     setThreshold: demo.setThreshold,     // réglage : local suffit (réel : table settings)
     addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
-    completeOnboarding: demo.completeOnboarding,
+    completeOnboarding: async (payload) => {
+      if (!REAL) return demo.completeOnboarding(payload);
+      setError(null);
+      try {
+        if (payload && payload.propertyName) {
+          const prop = await owner.addProperty({
+            name: payload.propertyName,
+            type: payload.type || "appartement",
+            city: payload.city || "",
+            district: payload.district || "",
+          });
+          await owner.addUnit(prop.id, {
+            label: payload.unitLabel || "Logement 1",
+            rent_amount: payload.rent || 0,
+            due_day: 5,
+          });
+        }
+        // marquer le profil comme onboardé (localement, pour sortir de l'écran d'onboarding)
+        setDb((d) => ({ ...d, owner: { ...d.owner, onboarded: true } }));
+        await load("proprietaire");
+      } catch (e) {
+        setError(e.message || "La création du logement a échoué.");
+      }
+    },
   };
 
   return api;
