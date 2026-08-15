@@ -59,6 +59,25 @@ export const owner = {
   async addUnit(propertyId, u) {
     return ok(await supabase.from("units").insert({ ...u, property_id: propertyId }).select().single());
   },
+  // S'assurer qu'un bail actif existe pour cette unité (en crée un si besoin).
+  async ensureLease(unitId, rentAmount) {
+    const existing = await supabase.from("leases").select("id").eq("unit_id", unitId).eq("active", true).maybeSingle();
+    if (existing.data && existing.data.id) return existing.data.id;
+    const created = ok(await supabase.from("leases").insert({
+      unit_id: unitId, rent_amount: rentAmount || 0, active: true,
+    }).select().single());
+    return created.id;
+  },
+  // Enregistrer un paiement pour une unité (crée le bail à la volée si nécessaire).
+  async recordPaymentForUnit(unitId, rentAmount) {
+    const leaseId = await this.ensureLease(unitId, rentAmount);
+    const now = new Date();
+    const period = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    return ok(await supabase.from("rent_payments").insert({
+      lease_id: leaseId, period, amount: rentAmount || 0, status: "paye", method: "autre",
+      paid_at: now.toISOString().slice(0, 10),
+    }).select().single());
+  },
   async problems() {
     return ok(await supabase.from("maintenance_requests").select("*, units(label, property_id)").order("created_at", { ascending: false }));
   },

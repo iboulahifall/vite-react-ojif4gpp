@@ -211,9 +211,14 @@ export function useKerData() {
   const api = {
     db, loading, error, REAL,
     load,
-    recordPayment: wrap(
-      (leaseId, period, amount) => tenant.recordPayment(leaseId, { period, amount }),
-      demo.recordPayment),
+    recordPayment: async (unitId, rentAmount) => {
+      if (!REAL) return demo.recordPayment(unitId);
+      setError(null);
+      try {
+        await owner.recordPaymentForUnit(unitId, rentAmount || 0);
+        await load(roleRef.current || "proprietaire");
+      } catch (e) { setError(e.message || "Enregistrement du paiement impossible."); }
+    },
     reportProblem: wrap(
       (unitId, category, description) => tenant.reportProblem(unitId, { category, description }),
       demo.addProblem),
@@ -228,6 +233,46 @@ export function useKerData() {
       demo.setExpenseStatus),
     setThreshold: demo.setThreshold,     // réglage : local suffit (réel : table settings)
     addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
+    // Ajouter un logement (propriétaire)
+    addProperty: async (p) => {
+      if (!REAL) {
+        setDb((d) => {
+          const nd = structuredClone(d);
+          nd.properties.push({
+            id: "p" + Date.now(), name: p.name, type: p.type || "appartement",
+            city: p.city || "", district: p.district || "",
+            units: [], problems: [], expenses: [],
+          });
+          return nd;
+        });
+        return;
+      }
+      setError(null);
+      try {
+        const prop = await owner.addProperty({ name: p.name, type: p.type || "appartement", city: p.city || "", district: p.district || "" });
+        if (p.unitLabel) {
+          await owner.addUnit(prop.id, { label: p.unitLabel, rent_amount: p.rent || 0, due_day: 5 });
+        }
+        await load("proprietaire");
+      } catch (e) { setError(e.message || "Création du logement impossible."); }
+    },
+    // Ajouter un appartement/unité à un logement existant
+    addUnit: async (propId, u) => {
+      if (!REAL) {
+        setDb((d) => {
+          const nd = structuredClone(d);
+          const prop = nd.properties.find((x) => x.id === propId);
+          if (prop) prop.units.push({ id: "u" + Date.now(), label: u.label, rent: u.rent || 0, due: 5, tenant: "—", code: "KER-" + Math.floor(10000 + Math.random() * 89999), payments: mkHist(u.rent || 0, ["wait"]) });
+          return nd;
+        });
+        return;
+      }
+      setError(null);
+      try {
+        await owner.addUnit(propId, { label: u.label, rent_amount: u.rent || 0, due_day: 5 });
+        await load("proprietaire");
+      } catch (e) { setError(e.message || "Ajout de l'appartement impossible."); }
+    },
     completeOnboarding: async (payload) => {
       if (!REAL) return demo.completeOnboarding(payload);
       setError(null);
