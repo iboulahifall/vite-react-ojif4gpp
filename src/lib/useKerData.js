@@ -88,7 +88,8 @@ function adaptProperties(rows) {
       }));
       return {
         id: u.id, label: u.label, rent: u.rent_amount || lease.rent_amount || 0,
-        due: u.due_day || 5, tenant: lease.tenant_name || "—", code: lease.code || "",
+        due: u.due_day || 5, tenant: lease.tenant_name || "—",
+        code: u.invite_code || "",
         payments: pays.length ? pays : mkHist(u.rent_amount || 0, ["wait"]),
       };
     }),
@@ -186,8 +187,26 @@ export function useKerData() {
         setDb((d) => ({ ...d, properties: adaptProperties(props) }));
       } else if (role === "locataire") {
         const lease = await tenant.myLease();
-        // on stocke le bail brut ; les écrans locataire le lisent tel quel
-        setDb((d) => ({ ...d, tenantLease: lease }));
+        if (lease && lease.units) {
+          const u = lease.units;
+          const prop = u.properties || {};
+          const pays = (lease.rent_payments || []).map((r) => ({
+            period: r.period, amount: r.amount, status: r.status, paid_at: r.paid_at,
+          }));
+          // On fabrique une "propriété" à une unité, pour réutiliser l'écran locataire.
+          const unit = {
+            id: u.id, label: u.label, rent: lease.rent_amount || u.rent_amount || 0,
+            due: lease.due_day || u.due_day || 5, tenant: "Vous",
+            code: u.invite_code || "", leaseId: lease.id,
+            payments: pays.length ? pays : mkHist(lease.rent_amount || 0, ["wait"]),
+          };
+          setDb((d) => ({
+            ...d, tenantLease: lease,
+            properties: [{ id: prop.id || "p_t", name: prop.name || "Mon logement", city: prop.city || "", district: "", units: [unit], problems: [], expenses: [] }],
+          }));
+        } else {
+          setDb((d) => ({ ...d, tenantLease: null }));
+        }
       }
     } catch (e) {
       setError(e.message || "Impossible de charger les données.");
@@ -211,12 +230,19 @@ export function useKerData() {
   const api = {
     db, loading, error, REAL,
     load,
-    recordPayment: async (unitId, rentAmount) => {
+    recordPayment: async (unitId, rentAmount, leaseId) => {
       if (!REAL) return demo.recordPayment(unitId);
       setError(null);
       try {
-        await owner.recordPaymentForUnit(unitId, rentAmount || 0);
-        await load(roleRef.current || "proprietaire");
+        if (roleRef.current === "locataire" && leaseId) {
+          const now = new Date();
+          const period = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+          await tenant.recordPayment(leaseId, { period, amount: rentAmount || 0 });
+          await load("locataire");
+        } else {
+          await owner.recordPaymentForUnit(unitId, rentAmount || 0);
+          await load(roleRef.current || "proprietaire");
+        }
       } catch (e) { setError(e.message || "Enregistrement du paiement impossible."); }
     },
     reportProblem: wrap(
@@ -233,7 +259,27 @@ export function useKerData() {
       demo.setExpenseStatus),
     setThreshold: demo.setThreshold,     // réglage : local suffit (réel : table settings)
     addDocument: demo.addDocument,       // en réel : owner.documents() au prochain load
-    // Ajouter un logement (propriétaire)
+    // --- Parcours locataire ---
+    tenantLease: db.tenantLease || null,
+    findUnitByCode: async (code) => {
+      if (!REAL) {
+        const u = demoSeed().properties[0].units.find((x) => x.code.toUpperCase() === code.trim().toUpperCase());
+        return u ? { unit_label: u.label, property_name: "Immeuble Parcelles", rent: u.rent } : null;
+      }
+      return tenant.findUnitByCode(code);
+    },
+    joinWithCode: async (code, fullName) => {
+      if (!REAL) { await load("locataire"); return "demo"; }
+      setError(null);
+      const leaseId = await tenant.joinWithCode(code, fullName); // peut throw → géré par l'appelant
+      await load("locataire");
+      return leaseId;
+    },
+    // Code d'invitation réel d'une unité (pour l'écran "Inviter le locataire")
+    inviteCode: async (unitId, fallback) => {
+      if (!REAL) return fallback || "";
+      try { return await owner.unitInviteCode(unitId); } catch (e) { return fallback || ""; }
+    },
     addProperty: async (p) => {
       if (!REAL) {
         setDb((d) => {

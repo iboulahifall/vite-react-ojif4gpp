@@ -145,6 +145,25 @@ export const tenant = {
   async myDocuments() {
     return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
   },
+  // Valider un code d'invitation (renvoie l'unité correspondante, ou null).
+  async findUnitByCode(code) {
+    const { data, error } = await supabase.rpc("find_unit_by_code", { p_code: code });
+    if (error) throw new Error(error.message);
+    return (data && data[0]) || null;
+  },
+  // Rejoindre une unité via un code : crée le bail et renvoie son id.
+  async joinWithCode(code, fullName) {
+    const { data, error } = await supabase.rpc("join_unit_with_code", { p_code: code, p_full_name: fullName || null });
+    if (error) throw new Error(error.message);
+    return data; // lease id
+  },
+};
+
+/* ---------------- OWNER : code d'invitation d'une unité ---------------- */
+owner.unitInviteCode = async function (unitId) {
+  const { data, error } = await supabase.from("units").select("invite_code").eq("id", unitId).single();
+  if (error) throw new Error(error.message);
+  return data.invite_code;
 };
 
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
