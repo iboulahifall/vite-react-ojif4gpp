@@ -281,6 +281,18 @@ owner.unitInviteCode = async function (unitId) {
   return data.invite_code;
 };
 
+/* ---------------- NOTIFICATIONS ---------------- */
+export const notifications = {
+  async list() {
+    return ok(await supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(50));
+  },
+  async markAllRead() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    return ok(await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false));
+  },
+};
+
 /* ---------------- QUITTANCES (preuves de paiement) ---------------- */
 export const receipts = {
   // Toutes les quittances qui me concernent (RLS filtre : mes quittances locataire OU proprio)

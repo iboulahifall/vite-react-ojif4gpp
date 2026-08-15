@@ -3,7 +3,7 @@ import { useKerData, REAL } from "./lib/useKerData.js";
 import AuthScreen from "./lib/AuthScreen.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
-  Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2,
+  Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2, Bell,
   CircleDot, ArrowRight, X, FileText, Download, Users,
   Droplet, Zap, ShowerHead, DoorClosed, Snowflake, MoreHorizontal,
   Camera, MessageCircle, Copy, Check, UserPlus, LogOut,
@@ -217,6 +217,7 @@ export default function KerApp() {
   const uploadProblemPhoto = (file) => ker.uploadProblemPhoto(file);
   const openPhoto = (path) => ker.photoUrl(path);
   const updateProfile = (patch) => ker.updateProfile(patch);
+  const markNotificationsRead = () => ker.markNotificationsRead();
   const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
   const updateRepair = (id, patch) => ker.updateRepair(id, patch);
   const addExpense = (propId, label, category, amount, by, extra) => ker.addExpense(propId, label, category, amount, by, extra);
@@ -276,7 +277,7 @@ export default function KerApp() {
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus} onRepair={updateRepair} onOpenPhoto={openPhoto}
       onExpenseStatus={setExpenseStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} onDeleteExpense={deleteExpense} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
-      onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} logout={handleLogout} />;
+      onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} onMarkNotifsRead={markNotificationsRead} logout={handleLogout} />;
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} logout={handleLogout} />;
   // Locataire en mode réel : s'il n'a pas encore de bail, on lui demande son code.
@@ -399,7 +400,7 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onAddExpense, onUploadReceipt, onDeleteExpense, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpenseStatus, onAddExpense, onUploadReceipt, onDeleteExpense, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, onUpdateProfile, onMarkNotifsRead, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -415,6 +416,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
   return (
     <Shell nav={<BottomNav items={items} active={view.name} onPick={(n) => setView({ name: n })} />}>
       {view.name === "dashboard" && <OwnerDashboard db={db} props={props} stats={stats} go={setView} logout={logout} />}
+      {view.name === "notifications" && <NotificationsScreen notifs={db.notifications || []} onMarkRead={onMarkNotifsRead} back={() => setView({ name: "dashboard" })} />}
       {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} onAdd={() => setAddProp(true)} />}
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
@@ -500,6 +502,14 @@ function OwnerDashboard({ db, props, stats, go, logout }) {
           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700 }}>{db.owner.full_name}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => go({ name: "notifications" })} style={{ ...navIcon, position: "relative" }} title="Notifications">
+            <Bell size={18} color={T.ink} />
+            {(db.notifications || []).filter((n) => !n.read).length > 0 && (
+              <span style={{ position: "absolute", top: 4, right: 4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: T.late, color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center" }}>
+                {(db.notifications || []).filter((n) => !n.read).length}
+              </span>
+            )}
+          </button>
           <button onClick={() => go({ name: "profile" })} style={navIcon} title="Mon profil"><Settings size={18} color={T.ink} /></button>
           <button onClick={logout} style={navIcon} title="Changer d'espace"><LogOut size={18} color={T.ink} /></button>
         </div>
@@ -1446,6 +1456,49 @@ function Documents({ docs, properties, back, onReceipts, onUpload, onOpen, onDel
         </Sheet>
       )}
     </Screen>
+  );
+}
+
+/* ===================== NOTIFICATIONS ===================== */
+function NotificationsScreen({ notifs, onMarkRead, back }) {
+  useEffect(() => { if (onMarkRead && (notifs || []).some((n) => !n.read)) onMarkRead(); }, []);
+  const timeAgo = (iso) => {
+    if (!iso) return "";
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (diff < 1) return "à l'instant";
+    if (diff < 60) return "il y a " + diff + " min";
+    const h = Math.floor(diff / 60);
+    if (h < 24) return "il y a " + h + " h";
+    const j = Math.floor(h / 24);
+    return "il y a " + j + " j";
+  };
+  return (
+    <Shell>
+      <Screen title="Notifications" back={back}>
+        {(!notifs || notifs.length === 0) ? (
+          <div style={{ textAlign: "center", color: T.mut, padding: "48px 20px" }}>
+            <Bell size={40} color={T.line} />
+            <div style={{ marginTop: 12, fontSize: 15 }}>Aucune notification.</div>
+            <div style={{ fontSize: 13, marginTop: 6 }}>Vous serez prévenu ici des paiements, problèmes et dépenses à valider.</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {notifs.map((n) => (
+              <div key={n.id} style={{ ...card, display: "flex", gap: 12, alignItems: "flex-start", borderLeft: "3px solid " + (n.read ? T.line : T.teal) }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: T.tealSoft, color: T.teal, display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <Bell size={17} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>{n.title}</div>
+                  {n.body && <div style={{ fontSize: 13.5, color: T.mut, marginTop: 2 }}>{n.body}</div>}
+                  <div style={{ fontSize: 12, color: T.mut, marginTop: 4 }}>{timeAgo(n.created_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Screen>
+    </Shell>
   );
 }
 
