@@ -219,6 +219,9 @@ export default function KerApp() {
   const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
   const setThreshold = (value) => ker.setThreshold(value);
   const addDocument = (doc) => ker.addDocument(doc);
+  const uploadDocument = (file, meta) => ker.uploadDocument(file, meta);
+  const openDocument = (fileUrl) => ker.openDocument(fileUrl);
+  const deleteDocument = (id, fileUrl) => ker.deleteDocument(id, fileUrl);
   const addProperty = (p) => ker.addProperty(p);
   const addUnit = (propId, u) => ker.addUnit(propId, u);
   const completeOnboarding = (payload) => ker.completeOnboarding(payload);
@@ -266,6 +269,7 @@ export default function KerApp() {
   if (session.role === "proprietaire")
     return <OwnerApp db={db} onRecord={recordPayment} onProblemStatus={setProblemStatus}
       onExpenseStatus={setExpenseStatus} onThreshold={setThreshold} onAddDocument={addDocument}
+      onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} logout={handleLogout} />;
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} logout={handleLogout} />;
@@ -389,7 +393,7 @@ function RolePicker({ onPick, db }) {
 }
 
 /* ===================== PROPRIETAIRE ===================== */
-function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold, onAddDocument, onAddProperty, onAddUnit, logout }) {
+function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold, onAddDocument, onUploadDocument, onOpenDocument, onDeleteDocument, onAddProperty, onAddUnit, logout }) {
   const [view, setView] = useState({ name: "dashboard" });
   const [receipt, setReceipt] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -411,7 +415,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onExpenseStatus, onThreshold,
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
       {view.name === "report" && <MonthlyReport props={props} back={() => setView({ name: "dashboard" })} />}
-      {view.name === "documents" && <Documents docs={db.documents || []} back={() => setView({ name: "dashboard" })} onReceipts={() => setView({ name: "receipts" })} />}
+      {view.name === "documents" && <Documents docs={db.documents || []} properties={props} back={() => setView({ name: "dashboard" })} onReceipts={() => setView({ name: "receipts" })} onUpload={onUploadDocument} onOpen={onOpenDocument} onDelete={onDeleteDocument} />}
       {view.name === "receipts" && <ReceiptsScreen receipts={db.receipts || []} back={() => setView({ name: "documents" })} />}
       {receipt && <ReceiptModal data={receipt} owner={db.owner} onSaved={onAddDocument} close={() => setReceipt(null)} />}
       {invite && <InviteModal unit={invite} close={() => setInvite(null)} />}
@@ -1096,17 +1100,48 @@ const DOC_META = {
 };
 const DOC_FILTERS = ["tous", "contrat", "quittance", "facture", "devis", "justificatif", "photo"];
 
-function Documents({ docs, back, onReceipts }) {
+function Documents({ docs, properties, back, onReceipts, onUpload, onOpen, onDelete }) {
   const [filter, setFilter] = useState("tous");
   const [q, setQ] = useState("");
+  const [pending, setPending] = useState(null);   // fichier choisi, en attente de catégorie
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
   const list = docs.filter((d) => {
     const okCat = filter === "tous" || d.category === filter;
     const okQ = !q.trim() || (d.name || "").toLowerCase().includes(q.toLowerCase());
     return okCat && okQ;
   });
+
+  const pickFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setErr(null);
+    // limite raisonnable : 10 Mo
+    if (file.size > 10 * 1024 * 1024) { setErr("Fichier trop volumineux (max 10 Mo)."); return; }
+    setPending({ file, category: "facture", name: file.name });
+    e.target.value = ""; // permet de re-choisir le même fichier
+  };
+
+  const confirmUpload = async () => {
+    if (!pending || !onUpload) return;
+    setBusy(true); setErr(null);
+    try {
+      await onUpload(pending.file, { category: pending.category, name: pending.name });
+      setPending(null);
+    } catch (e) { setErr((e && e.message) || "Envoi impossible."); }
+    finally { setBusy(false); }
+  };
+
+  const openDoc = async (d) => {
+    if (!onOpen) return;
+    const url = await onOpen(d.file_url);
+    if (url) window.open(url, "_blank");
+  };
+
   return (
     <Screen title="Mes documents" back={back}
-      action={<label style={{ ...addBtn, cursor: "pointer" }}><Upload size={16} /> Ajouter<input type="file" style={{ display: "none" }} /></label>}>
+      action={<label style={{ ...addBtn, cursor: "pointer" }}><Upload size={16} /> Ajouter
+        <input type="file" accept="image/*,application/pdf" onChange={pickFile} style={{ display: "none" }} /></label>}>
       {onReceipts && (
         <button onClick={onReceipts} style={{ ...cardBtn, width: "100%", marginBottom: 12 }}>
           <span style={{ width: 40, height: 40, borderRadius: 11, background: T.paid + "18", color: T.paid, display: "grid", placeItems: "center" }}><Receipt size={18} /></span>
@@ -1117,6 +1152,9 @@ function Documents({ docs, back, onReceipts }) {
           <ChevronRight size={18} color={T.mut} />
         </button>
       )}
+
+      {err && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>{err}</div>}
+
       <div style={{ display: "flex", alignItems: "center", gap: 8, background: T.card, border: "1px solid " + T.line, borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
         <Search size={16} color={T.mut} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un document"
@@ -1139,6 +1177,7 @@ function Documents({ docs, back, onReceipts }) {
         <div style={{ display: "grid", gap: 10 }}>
           {list.map((d) => {
             const meta = DOC_META[d.category] || DOC_META.autre;
+            const dateStr = d.date || (d.created_at ? new Date(d.created_at).toLocaleDateString("fr-FR") : "");
             return (
               <div key={d.id} style={{ ...card, display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 12, background: meta.tint + "18", color: meta.tint, display: "grid", placeItems: "center", flexShrink: 0 }}>
@@ -1146,13 +1185,40 @@ function Documents({ docs, back, onReceipts }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
-                  <div style={{ fontSize: 13, color: T.mut }}>{meta.label}{d.unit ? " · " + d.unit : ""} · {d.date}</div>
+                  <div style={{ fontSize: 13, color: T.mut }}>{meta.label}{dateStr ? " · " + dateStr : ""}</div>
                 </div>
-                <button style={navIcon} title="Apercu"><ArrowRight size={16} /></button>
+                {d.file_url && <button onClick={() => openDoc(d)} style={navIcon} title="Ouvrir"><ArrowRight size={16} /></button>}
+                {onDelete && <button onClick={() => onDelete(d.id, d.file_url)} style={navIcon} title="Supprimer"><X size={16} color={T.late} /></button>}
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* Feuille : choisir la catégorie du fichier choisi */}
+      {pending && (
+        <Sheet close={() => setPending(null)} title="Classer le document">
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ fontSize: 13, color: T.mut, wordBreak: "break-all" }}>{pending.name}</div>
+            <FormField label="Nom du document">
+              <input value={pending.name} onChange={(e) => setPending((p) => ({ ...p, name: e.target.value }))} style={fieldInput} />
+            </FormField>
+            <FormField label="Catégorie">
+              <select value={pending.category} onChange={(e) => setPending((p) => ({ ...p, category: e.target.value }))} style={fieldInput}>
+                <option value="contrat">Contrat</option>
+                <option value="facture">Facture</option>
+                <option value="devis">Devis</option>
+                <option value="justificatif">Justificatif</option>
+                <option value="photo">Photo</option>
+                <option value="autre">Autre</option>
+              </select>
+            </FormField>
+            {err && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{err}</div>}
+            <button onClick={confirmUpload} disabled={busy} style={{ ...primaryBtn, justifyContent: "center", padding: 14, opacity: busy ? 0.6 : 1 }}>
+              {busy ? "Envoi en cours…" : "Envoyer le document"}
+            </button>
+          </div>
+        </Sheet>
       )}
     </Screen>
   );

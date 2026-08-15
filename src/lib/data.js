@@ -176,8 +176,7 @@ export const receipts = {
 
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
 export const storage = {
-  // Bucket privé "documents" à créer dans Supabase. Upload compressé côté client
-  // avant appel (§34) — voir compressImage dans l'app.
+  // Bucket privé "documents". Chemin = {user_id}/{timestamp}-{nom}
   async upload(path, file) {
     const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
     if (error) throw new Error(error.message);
@@ -187,5 +186,42 @@ export const storage = {
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, seconds);
     if (error) throw new Error(error.message);
     return data.signedUrl;
+  },
+  async remove(path) {
+    const { error } = await supabase.storage.from("documents").remove([path]);
+    if (error) throw new Error(error.message);
+    return true;
+  },
+};
+
+/* ---------------- DOCUMENTS (gestion complète) ---------------- */
+export const docs = {
+  // Uploade un fichier + crée la ligne en base. Renvoie le document créé.
+  async add(file, { category = "autre", name, propertyId = null, unitId = null }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    // chemin unique dans le bucket, préfixé par l'id user (isolation)
+    const safeName = (name || file.name || "fichier").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/" + Date.now() + "-" + safeName;
+    await storage.upload(path, file);
+    const row = ok(await supabase.from("documents").insert({
+      owner_id: user.id, property_id: propertyId, unit_id: unitId,
+      category, name: name || file.name, file_url: path,
+    }).select().single());
+    return row;
+  },
+  // Liste mes documents (RLS filtre selon le rôle)
+  async list() {
+    return ok(await supabase.from("documents").select("*").order("created_at", { ascending: false }));
+  },
+  // Lien signé temporaire pour consulter/télécharger
+  async open(fileUrl) {
+    return storage.signedUrl(fileUrl, 3600);
+  },
+  // Supprime le fichier + la ligne
+  async remove(id, fileUrl) {
+    if (fileUrl) { try { await storage.remove(fileUrl); } catch (e) {} }
+    ok(await supabase.from("documents").delete().eq("id", id));
+    return true;
   },
 };
