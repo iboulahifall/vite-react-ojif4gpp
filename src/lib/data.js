@@ -170,6 +170,18 @@ export const manager = {
   async properties() {
     return ok(await supabase.from("properties").select("*, units(*)").order("created_at", { ascending: true }));
   },
+  // Valider un code d'affectation (renvoie le logement).
+  async findPropertyByCode(code) {
+    const { data, error } = await supabase.rpc("find_property_by_manager_code", { p_code: code });
+    if (error) throw new Error(error.message);
+    return (data && data[0]) || null;
+  },
+  // Rejoindre un logement comme gestionnaire.
+  async joinAsManager(code, fullName) {
+    const { data, error } = await supabase.rpc("join_as_manager", { p_code: code, p_full_name: fullName || null });
+    if (error) throw new Error(error.message);
+    return data;
+  },
   // Le statut (auto_validee / attente_validation) est décidé par un trigger SQL
   // selon settings.approval_threshold — le front n'a pas à en décider (§11).
   async addExpense(propertyId, e) {
