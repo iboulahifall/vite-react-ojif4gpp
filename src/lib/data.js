@@ -331,6 +331,127 @@ export const receipts = {
   },
 };
 
+/* ---------------- CONTRÔLE LOGEMENT (états des lieux / inspections) ---------------- */
+export const inspections = {
+  // Liste des inspections d'une unité (logement), plus récentes d'abord.
+  async listForUnit(unitId) {
+    return ok(await supabase.from("inspections")
+      .select("*")
+      .eq("unit_id", unitId)
+      .order("created_at", { ascending: false }));
+  },
+
+  // Toutes les inspections accessibles à l'utilisateur (RLS filtre proprio/gestionnaire/locataire).
+  async listAll() {
+    return ok(await supabase.from("inspections")
+      .select("*, units(label, property_id, properties(name))")
+      .order("created_at", { ascending: false }));
+  },
+
+  // Crée une inspection (en-tête). type = 'entree' | 'sortie' | 'periodique'.
+  async create(unitId, { type, title, scheduledAt, leaseId }) {
+    const { data: { user } } = await supabase.auth.getUser();
+    return ok(await supabase.from("inspections").insert({
+      unit_id: unitId,
+      lease_id: leaseId || null,
+      type,
+      title: title || null,
+      scheduled_at: scheduledAt || null,
+      created_by: user ? user.id : null,
+      status: "brouillon",
+    }).select().single());
+  },
+
+  // Détail complet d'une inspection : en-tête + pièces + éléments.
+  async detail(inspectionId) {
+    const insp = ok(await supabase.from("inspections")
+      .select("*, units(label, property_id, properties(name))")
+      .eq("id", inspectionId).single());
+    const rooms = ok(await supabase.from("inspection_rooms")
+      .select("*")
+      .eq("inspection_id", inspectionId)
+      .order("position", { ascending: true }));
+    const roomIds = rooms.map((r) => r.id);
+    let items = [];
+    if (roomIds.length) {
+      items = ok(await supabase.from("inspection_items")
+        .select("*")
+        .in("room_id", roomIds)
+        .order("position", { ascending: true }));
+    }
+    // regroupe les éléments dans leur pièce
+    const byRoom = {};
+    for (const it of items) { (byRoom[it.room_id] = byRoom[it.room_id] || []).push(it); }
+    return { ...insp, rooms: rooms.map((r) => ({ ...r, items: byRoom[r.id] || [] })) };
+  },
+
+  // Change le statut (brouillon -> en_cours -> finalise -> signe) et notes générales.
+  async update(inspectionId, patch) {
+    const clean = {};
+    if (patch.status !== undefined) clean.status = patch.status;
+    if (patch.title !== undefined) clean.title = patch.title;
+    if (patch.generalNotes !== undefined) clean.general_notes = patch.generalNotes;
+    if (patch.performedAt !== undefined) clean.performed_at = patch.performedAt;
+    return ok(await supabase.from("inspections").update(clean).eq("id", inspectionId).select().single());
+  },
+
+  async remove(inspectionId) {
+    return ok(await supabase.from("inspections").delete().eq("id", inspectionId));
+  },
+
+  // ----- PIÈCES -----
+  async addRoom(inspectionId, name, position = 0) {
+    return ok(await supabase.from("inspection_rooms").insert({
+      inspection_id: inspectionId, name, position,
+    }).select().single());
+  },
+  async removeRoom(roomId) {
+    return ok(await supabase.from("inspection_rooms").delete().eq("id", roomId));
+  },
+
+  // ----- ÉLÉMENTS -----
+  // kind = 'etat' | 'compteur' | 'cle'
+  async addItem(roomId, { label, itemKind = "etat", position = 0 }) {
+    return ok(await supabase.from("inspection_items").insert({
+      room_id: roomId, label, item_kind: itemKind, position,
+    }).select().single());
+  },
+  // Met à jour un élément (état, commentaire, photos, relevé compteur, nb clés).
+  async updateItem(itemId, patch) {
+    const clean = {};
+    if (patch.condition !== undefined) clean.condition = patch.condition;
+    if (patch.comment !== undefined) clean.comment = patch.comment;
+    if (patch.photoUrls !== undefined) clean.photo_urls = patch.photoUrls;
+    if (patch.meterValue !== undefined) clean.meter_value = patch.meterValue;
+    if (patch.meterUnit !== undefined) clean.meter_unit = patch.meterUnit;
+    if (patch.countValue !== undefined) clean.count_value = patch.countValue;
+    if (patch.label !== undefined) clean.label = patch.label;
+    return ok(await supabase.from("inspection_items").update(clean).eq("id", itemId).select().single());
+  },
+  async removeItem(itemId) {
+    return ok(await supabase.from("inspection_items").delete().eq("id", itemId));
+  },
+
+  // Uploade une photo d'inspection dans le bucket "documents", renvoie le chemin.
+  async uploadPhoto(rawFile) {
+    const file = await compressImage(rawFile);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    const safe = (file.name || "photo.jpg").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/inspections/" + Date.now() + "-" + safe;
+    const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    return data.path;
+  },
+  // Lien signé pour afficher une photo d'inspection.
+  async photoUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
+    if (error) return null;
+    return data.signedUrl;
+  },
+};
+
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
 export const storage = {
   // Bucket privé "documents". Chemin = {user_id}/{timestamp}-{nom}
