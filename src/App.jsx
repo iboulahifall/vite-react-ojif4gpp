@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useKerData, REAL } from "./lib/useKerData.js";
+import { useWalluData, REAL } from "./lib/useWalluData.js";
 import AuthScreen from "./lib/AuthScreen.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 /* ============================================================
-   KER GUI — « La maison » : le lien entre proprietaire et locataire.
+   WALLU — « La maison » : le lien entre proprietaire et locataire.
    « Votre logement au Senegal, controle depuis votre telephone. »
    v3 : proprietaire + locataire + gestionnaire.
    - Controle des depenses au seuil configurable (§11)
@@ -20,7 +20,7 @@ import {
    Renseignez SUPABASE_URL / SUPABASE_ANON_KEY pour passer en reel.
    Sinon -> MODE DEMO (donnees §32), sans jamais simuler de paiement reel.
    ============================================================ */
-// Le vrai mode est déterminé dans useKerData.js (REAL). DEMO = son inverse.
+// Le vrai mode est déterminé dans useWalluData.js (REAL). DEMO = son inverse.
 const DEMO = !REAL;
 
 /* Palette KËR — vert profond + doré (identité de marque).
@@ -34,9 +34,9 @@ const T = {
 
 /* Symbole KËR : deux chevrons (toit + lien montant). Réutilisable partout.
    animate=true : les deux chevrons se dessinent l'un après l'autre. */
-function KerMark({ size = 40, onDark = false, animate = false }) {
+function WalluMark({ size = 40, onDark = false, animate = false }) {
   const top = onDark ? "#F7F4EC" : T.teal;
-  const cls = animate ? "ker-draw" : "";
+  const cls = animate ? "wallu-draw" : "";
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: "inline-block", verticalAlign: "middle", overflow: "visible" }} aria-label="KËR">
       <path className={cls} d="M 18 60 L 50 26 L 82 60" fill="none" stroke={top} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" style={animate ? { animationDelay: "0.05s" } : undefined} />
@@ -68,13 +68,13 @@ const seed = () => ({
     id: "p1", name: "Immeuble Parcelles", type: "immeuble",
     city: "Dakar", district: "Parcelles Assainies",
     units: [
-      { id: "u1", label: "Appartement A", rent: 150000, due: 5, tenant: "Mamadou", code: "KER-45821",
+      { id: "u1", label: "Appartement A", rent: 150000, due: 5, tenant: "Mamadou", code: "WALLU-45821",
         payments: mkHist(150000, ["paye","paye","paye","late","paye","paye","paye","wait"]) },
-      { id: "u2", label: "Appartement B", rent: 150000, due: 5, tenant: "Awa", code: "KER-91043",
+      { id: "u2", label: "Appartement B", rent: 150000, due: 5, tenant: "Awa", code: "WALLU-91043",
         payments: mkHist(150000, ["paye","paye","paye","paye","paye","paye","paye","paye"]) },
-      { id: "u3", label: "Appartement C", rent: 150000, due: 5, tenant: "Fatou", code: "KER-33712",
+      { id: "u3", label: "Appartement C", rent: 150000, due: 5, tenant: "Fatou", code: "WALLU-33712",
         payments: mkHist(150000, ["paye","paye","paye","paye","paye","paye","paye","paye"]) },
-      { id: "u4", label: "Appartement D", rent: 150000, due: 5, tenant: "Ousmane", code: "KER-58260",
+      { id: "u4", label: "Appartement D", rent: 150000, due: 5, tenant: "Ousmane", code: "WALLU-58260",
         payments: mkHist(150000, ["paye","paye","paye","paye","paye","late","late","late"]) },
     ],
     problems: [
@@ -194,7 +194,7 @@ function buildMonthlyReport(properties) {
   return { label, expected, paid, lateCount, spend, rentExpected, rentPaid, rentLate, probNew, probProg, probDone, situation };
 }
 
-export default function KerApp() {
+export default function WalluApp() {
   const [sessionState, setSessionState] = useState(null);
 
   // Authentification réelle (Supabase). En mode démo, on ne s'en sert pas.
@@ -210,40 +210,40 @@ export default function KerApp() {
   }, []);
 
   // Source de données unique : démo si pas de clés Supabase, réel sinon.
-  // Voir src/lib/useKerData.js — l'app appelle les mêmes fonctions dans les deux cas.
-  const ker = useKerData();
-  const db = ker.db;
+  // Voir src/lib/useWalluData.js — l'app appelle les mêmes fonctions dans les deux cas.
+  const wallu = useWalluData();
+  const db = wallu.db;
   const session = sessionState;
 
-  const recordPayment = (unitId, rent, leaseId) => ker.recordPayment(unitId, rent, leaseId);
-  const addProblem = (unitId, category, desc, photoUrls) => ker.reportProblem(unitId, category, desc, photoUrls);
-  const uploadProblemPhoto = (file) => ker.uploadProblemPhoto(file);
-  const openPhoto = (path) => ker.photoUrl(path);
-  const updateProfile = (patch) => ker.updateProfile(patch);
-  const markNotificationsRead = () => ker.markNotificationsRead();
-  const setProblemStatus = (id, status) => ker.setProblemStatus(id, status);
-  const updateRepair = (id, patch) => ker.updateRepair(id, patch);
-  const addExpense = (propId, label, category, amount, by, extra) => ker.addExpense(propId, label, category, amount, by, extra);
-  const uploadExpenseReceipt = (file) => ker.uploadExpenseReceipt(file);
-  const deleteExpense = (propId, id, receiptUrl) => ker.deleteExpense(propId, id, receiptUrl);
-  const setExpenseStatus = (propId, id, status) => ker.setExpenseStatus(propId, id, status);
-  const setThreshold = (value) => ker.setThreshold(value);
-  const addDocument = (doc) => ker.addDocument(doc);
-  const uploadDocument = (file, meta) => ker.uploadDocument(file, meta);
-  const openDocument = (fileUrl) => ker.openDocument(fileUrl);
-  const deleteDocument = (id, fileUrl) => ker.deleteDocument(id, fileUrl);
-  const addProperty = (p) => ker.addProperty(p);
-  const addUnit = (propId, u) => ker.addUnit(propId, u);
-  const completeOnboarding = (payload) => ker.completeOnboarding(payload);
-  const joinWithCode = (code, fullName) => ker.joinWithCode(code, fullName);
-  const findUnitByCode = (code) => ker.findUnitByCode(code);
-  const joinAsManager = (code, fullName) => ker.joinAsManager(code, fullName);
-  const findPropertyByCode = (code) => ker.findPropertyByCode(code);
+  const recordPayment = (unitId, rent, leaseId) => wallu.recordPayment(unitId, rent, leaseId);
+  const addProblem = (unitId, category, desc, photoUrls) => wallu.reportProblem(unitId, category, desc, photoUrls);
+  const uploadProblemPhoto = (file) => wallu.uploadProblemPhoto(file);
+  const openPhoto = (path) => wallu.photoUrl(path);
+  const updateProfile = (patch) => wallu.updateProfile(patch);
+  const markNotificationsRead = () => wallu.markNotificationsRead();
+  const setProblemStatus = (id, status) => wallu.setProblemStatus(id, status);
+  const updateRepair = (id, patch) => wallu.updateRepair(id, patch);
+  const addExpense = (propId, label, category, amount, by, extra) => wallu.addExpense(propId, label, category, amount, by, extra);
+  const uploadExpenseReceipt = (file) => wallu.uploadExpenseReceipt(file);
+  const deleteExpense = (propId, id, receiptUrl) => wallu.deleteExpense(propId, id, receiptUrl);
+  const setExpenseStatus = (propId, id, status) => wallu.setExpenseStatus(propId, id, status);
+  const setThreshold = (value) => wallu.setThreshold(value);
+  const addDocument = (doc) => wallu.addDocument(doc);
+  const uploadDocument = (file, meta) => wallu.uploadDocument(file, meta);
+  const openDocument = (fileUrl) => wallu.openDocument(fileUrl);
+  const deleteDocument = (id, fileUrl) => wallu.deleteDocument(id, fileUrl);
+  const addProperty = (p) => wallu.addProperty(p);
+  const addUnit = (propId, u) => wallu.addUnit(propId, u);
+  const completeOnboarding = (payload) => wallu.completeOnboarding(payload);
+  const joinWithCode = (code, fullName) => wallu.joinWithCode(code, fullName);
+  const findUnitByCode = (code) => wallu.findUnitByCode(code);
+  const joinAsManager = (code, fullName) => wallu.joinAsManager(code, fullName);
+  const findPropertyByCode = (code) => wallu.findPropertyByCode(code);
 
   // Sélection d'un espace : mémorise la session ET déclenche le chargement réel.
   const setSession = (s) => {
     setSessionState(s);
-    if (s && s.role) ker.load(s.role);
+    if (s && s.role) wallu.load(s.role);
   };
 
   // Déconnexion : en réel, on ferme la session Supabase et on revient à l'écran de connexion.
@@ -283,14 +283,14 @@ export default function KerApp() {
       onExpenseStatus={setExpenseStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} onDeleteExpense={deleteExpense} onThreshold={setThreshold} onAddDocument={addDocument}
       onUploadDocument={uploadDocument} onOpenDocument={openDocument} onDeleteDocument={deleteDocument}
       onAddProperty={addProperty} onAddUnit={addUnit} onUpdateProfile={updateProfile} onMarkNotifsRead={markNotificationsRead} logout={handleLogout} />;
-  if (session.role === "gestionnaire" && REAL && !ker.managerHasProperties) {
+  if (session.role === "gestionnaire" && REAL && !wallu.managerHasProperties) {
     return <ManagerJoinScreen onJoin={joinAsManager} onFind={findPropertyByCode}
       defaultName={(authUser && authUser.profile && authUser.profile.full_name) || ""} logout={handleLogout} />;
   }
   if (session.role === "gestionnaire")
     return <ManagerApp db={db} onProblemStatus={setProblemStatus} onAddExpense={addExpense} onUploadReceipt={uploadExpenseReceipt} logout={handleLogout} />;
   // Locataire en mode réel : s'il n'a pas encore de bail, on lui demande son code.
-  if (session.role === "locataire" && REAL && !ker.tenantLease) {
+  if (session.role === "locataire" && REAL && !wallu.tenantLease) {
     return <JoinScreen onJoin={joinWithCode} onFind={findUnitByCode}
       defaultName={(authUser && authUser.profile && authUser.profile.full_name) || ""} logout={handleLogout} />;
   }
@@ -332,7 +332,7 @@ function ManagerJoinScreen({ onJoin, onFind, defaultName, logout }) {
   return (
     <Shell>
       <div style={{ paddingTop: 40, textAlign: "center" }}>
-        <KerMark size={54} />
+        <WalluMark size={54} />
         <div style={{ fontSize: 22, fontWeight: 800, marginTop: 12 }}>Gérer un logement</div>
         <div style={{ fontSize: 14, color: T.mut, marginTop: 6 }}>Entrez le code de gestion communiqué par le propriétaire.</div>
       </div>
@@ -402,7 +402,7 @@ function JoinScreen({ onJoin, onFind, defaultName, logout }) {
   return (
     <Shell>
       <div style={{ paddingTop: 40, textAlign: "center" }}>
-        <KerMark size={54} />
+        <WalluMark size={54} />
         <div style={{ fontSize: 22, fontWeight: 800, marginTop: 12 }}>Rejoindre mon logement</div>
         <div style={{ fontSize: 14, color: T.mut, marginTop: 6 }}>Entrez le code d'invitation communiqué par votre propriétaire.</div>
       </div>
@@ -449,18 +449,18 @@ function RolePicker({ onPick, db }) {
   return (
     <Shell>
       <div style={{ paddingTop: 48, textAlign: "center" }}>
-        <div className="ker-pop"><KerMark size={64} /></div>
-        <div className="ker-rise" style={{ fontFamily: "'Inter', sans-serif", fontSize: 42, fontWeight: 800, color: T.ink, letterSpacing: "2px", marginTop: 12, animationDelay: "0.7s" }}>WALLU</div>
-        <div className="ker-rise" style={{ fontSize: 13, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px", animationDelay: "0.85s" }}>TON BIEN, DANS TA MAIN.</div>
-        <div className="ker-rise" style={{ fontSize: 14, color: T.mut, marginTop: 10, animationDelay: "1s" }}>Gère ton bien au Sénégal toi-même,<br/>depuis ton téléphone. Sans agence.</div>
+        <div className="wallu-pop"><WalluMark size={64} /></div>
+        <div className="wallu-rise" style={{ fontFamily: "'Inter', sans-serif", fontSize: 42, fontWeight: 800, color: T.ink, letterSpacing: "2px", marginTop: 12, animationDelay: "0.7s" }}>WALLU</div>
+        <div className="wallu-rise" style={{ fontSize: 13, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px", animationDelay: "0.85s" }}>TON BIEN, DANS TA MAIN.</div>
+        <div className="wallu-rise" style={{ fontSize: 14, color: T.mut, marginTop: 10, animationDelay: "1s" }}>Gère ton bien au Sénégal toi-même,<br/>depuis ton téléphone. Sans agence.</div>
       </div>
       <div style={{ marginTop: 32, display: "grid", gap: 12 }}>
-        <div className="ker-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, animationDelay: "1.15s" }}>ESPACE PROPRIETAIRE</div>
-        <div className="ker-rise" style={{ animationDelay: "1.22s" }}><BigButton icon={Building2} label={"Continuer comme " + db.owner.full_name} sub="Tableau de bord & patrimoine" tint={T.teal} onClick={() => onPick({ role: "proprietaire" })} /></div>
-        <div className="ker-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, marginTop: 12, animationDelay: "1.32s" }}>ESPACE GESTIONNAIRE</div>
-        <div className="ker-rise" style={{ animationDelay: "1.39s" }}><BigButton icon={ClipboardList} label={"Continuer comme " + db.manager.full_name} sub="Biens sur place · depenses & problemes" tint={T.sun} onClick={() => onPick({ role: "gestionnaire" })} /></div>
-        <div className="ker-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, marginTop: 12, animationDelay: "1.49s" }}>ESPACE LOCATAIRE — via code d'invitation</div>
-        <div className="ker-rise" style={{ background: T.card, border: "1px solid " + T.line, borderRadius: 18, padding: 16, animationDelay: "1.56s" }}>
+        <div className="wallu-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, animationDelay: "1.15s" }}>ESPACE PROPRIETAIRE</div>
+        <div className="wallu-rise" style={{ animationDelay: "1.22s" }}><BigButton icon={Building2} label={"Continuer comme " + db.owner.full_name} sub="Tableau de bord & patrimoine" tint={T.teal} onClick={() => onPick({ role: "proprietaire" })} /></div>
+        <div className="wallu-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, marginTop: 12, animationDelay: "1.32s" }}>ESPACE GESTIONNAIRE</div>
+        <div className="wallu-rise" style={{ animationDelay: "1.39s" }}><BigButton icon={ClipboardList} label={"Continuer comme " + db.manager.full_name} sub="Biens sur place · depenses & problemes" tint={T.sun} onClick={() => onPick({ role: "gestionnaire" })} /></div>
+        <div className="wallu-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, marginTop: 12, animationDelay: "1.49s" }}>ESPACE LOCATAIRE — via code d'invitation</div>
+        <div className="wallu-rise" style={{ background: T.card, border: "1px solid " + T.line, borderRadius: 18, padding: 16, animationDelay: "1.56s" }}>
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="WAL-45821"
             style={{ width: "100%", border: "1px solid " + T.line, borderRadius: 12, padding: "12px 14px", fontSize: 16, fontFamily: "inherit", letterSpacing: "0.05em" }} />
           <button disabled={!match} onClick={() => onPick({ role: "locataire", unitId: match.id })}
@@ -1849,20 +1849,20 @@ function Shell({ children, nav }) {
         @media (prefers-reduced-motion: no-preference){
           .fade { animation: f .3s ease both; } @keyframes f { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
           /* Entrée d'accueil : le symbole se dessine, le nom monte, les blocs cascadent */
-          .ker-draw { stroke-dasharray: 130; stroke-dashoffset: 130; animation: kerDraw .5s ease forwards; }
-          @keyframes kerDraw { to { stroke-dashoffset: 0; } }
-          .ker-pop { animation: kerSpin .9s cubic-bezier(.2,.8,.2,1) both; }
-          @keyframes kerSpin {
+          .wallu-draw { stroke-dasharray: 130; stroke-dashoffset: 130; animation: walluDraw .5s ease forwards; }
+          @keyframes walluDraw { to { stroke-dashoffset: 0; } }
+          .wallu-pop { animation: walluSpin .9s cubic-bezier(.2,.8,.2,1) both; }
+          @keyframes walluSpin {
             from { opacity: 0; transform: rotate(-270deg) scale(.4); }
             60%  { opacity: 1; }
             to   { opacity: 1; transform: rotate(0deg) scale(1); }
           }
-          .ker-rise { opacity:0; animation: kerRise .5s cubic-bezier(.2,.8,.2,1) forwards; }
-          @keyframes kerRise { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: none; } }
+          .wallu-rise { opacity:0; animation: walluRise .5s cubic-bezier(.2,.8,.2,1) forwards; }
+          @keyframes walluRise { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: none; } }
         }
         @media (prefers-reduced-motion: reduce){
-          .ker-draw { stroke-dashoffset: 0; }
-          .ker-pop, .ker-rise { opacity: 1; }
+          .wallu-draw { stroke-dashoffset: 0; }
+          .wallu-pop, .wallu-rise { opacity: 1; }
         }
       `}</style>
       <div style={{ maxWidth: 480, margin: "0 auto", padding: "0 16px" }}>

@@ -1,4 +1,4 @@
-/* KËR — useKerData
+/* WALLU — useWalluData
    ------------------------------------------------------------------
    Point d'entrée unique pour les données de l'app. Il bascule tout seul :
    - MODE DÉMO  (clés Supabase absentes) : état local en mémoire, données §32.
@@ -11,9 +11,9 @@
 
    Installation :  placer ce fichier dans src/lib/ à côté de data.js.
    Utilisation dans App.jsx :
-       const ker = useKerData();
-       ker.load();                       // au démarrage
-       await ker.recordPayment(unitId);  // etc.
+       const wallu = useWalluData();
+       wallu.load();                       // au démarrage
+       await wallu.recordPayment(unitId);  // etc.
 */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { auth, owner, manager, tenant, receipts, docs as docsApi, notifications as notifApi } from "./data.js";
@@ -45,13 +45,13 @@ function demoSeed() {
       id: "p1", name: "Immeuble Parcelles", type: "immeuble",
       city: "Dakar", district: "Parcelles Assainies",
       units: [
-        { id: "u1", label: "Appartement A", rent: 150000, due: 5, tenant: "Mamadou", code: "KER-45821",
+        { id: "u1", label: "Appartement A", rent: 150000, due: 5, tenant: "Mamadou", code: "WALLU-45821",
           payments: mkHist(150000, ["paye","paye","paye","late","paye","paye","paye","wait"]) },
-        { id: "u2", label: "Appartement B", rent: 150000, due: 5, tenant: "Awa", code: "KER-91043",
+        { id: "u2", label: "Appartement B", rent: 150000, due: 5, tenant: "Awa", code: "WALLU-91043",
           payments: mkHist(150000, ["paye","paye","paye","paye","paye","paye","paye","paye"]) },
-        { id: "u3", label: "Appartement C", rent: 150000, due: 5, tenant: "Fatou", code: "KER-33712",
+        { id: "u3", label: "Appartement C", rent: 150000, due: 5, tenant: "Fatou", code: "WALLU-33712",
           payments: mkHist(150000, ["paye","paye","paye","paye","paye","paye","paye","paye"]) },
-        { id: "u4", label: "Appartement D", rent: 150000, due: 5, tenant: "Ousmane", code: "KER-58260",
+        { id: "u4", label: "Appartement D", rent: 150000, due: 5, tenant: "Ousmane", code: "WALLU-58260",
           payments: mkHist(150000, ["paye","paye","paye","paye","paye","late","late","late"]) },
       ],
       problems: [
@@ -72,7 +72,7 @@ function demoSeed() {
       { id: "d3", category: "facture", name: "Facture plomberie App. B", unit: "Appartement B", date: "02/" + (new Date().getMonth() + 1) + "/" + new Date().getFullYear() },
     ],
     receipts: [
-      { id: "r1", number: "KER-Q-2026-000001", tenant_name: "Awa", owner_name: "Ibrahima", property_name: "Immeuble Parcelles", unit_label: "Appartement B", period: "2026-07", amount: 150000, paid_at: "2026-07-05" },
+      { id: "r1", number: "WALLU-Q-2026-000001", tenant_name: "Awa", owner_name: "Ibrahima", property_name: "Immeuble Parcelles", unit_label: "Appartement B", period: "2026-07", amount: 150000, paid_at: "2026-07-05" },
     ],
     notifications: [
       { id: "n1", title: "Nouveau problème signalé", body: "Plomberie — Appartement B", read: false, created_at: new Date().toISOString() },
@@ -106,7 +106,7 @@ function adaptProperties(rows) {
 }
 
 /* ================================================================== */
-export function useKerData() {
+export function useWalluData() {
   const [db, setDb] = useState(demoSeed);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -156,7 +156,7 @@ export function useKerData() {
           id: "p" + Date.now(), name: payload.propertyName, type: payload.type || "appartement",
           city: payload.city || "", district: payload.district || "",
           units: [{ id: "u" + Date.now(), label: payload.unitLabel || "Logement 1", rent: payload.rent || 0, due: 5,
-            tenant: payload.tenant || "Locataire", code: "KER-" + Math.floor(10000 + Math.random() * 89999),
+            tenant: payload.tenant || "Locataire", code: "WALLU-" + Math.floor(10000 + Math.random() * 89999),
             payments: mkHist(payload.rent || 0, ["wait"]) }],
           problems: [], expenses: [],
         });
@@ -444,7 +444,7 @@ export function useKerData() {
         setDb((d) => {
           const nd = structuredClone(d);
           const prop = nd.properties.find((x) => x.id === propId);
-          if (prop) prop.units.push({ id: "u" + Date.now(), label: u.label, rent: u.rent || 0, due: 5, tenant: "—", code: "KER-" + Math.floor(10000 + Math.random() * 89999), payments: mkHist(u.rent || 0, ["wait"]) });
+          if (prop) prop.units.push({ id: "u" + Date.now(), label: u.label, rent: u.rent || 0, due: 5, tenant: "—", code: "WALLU-" + Math.floor(10000 + Math.random() * 89999), payments: mkHist(u.rent || 0, ["wait"]) });
           return nd;
         });
         return;
