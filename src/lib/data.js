@@ -82,6 +82,24 @@ export const auth = {
   async signIn({ email, password }) {
     return ok(await supabase.auth.signInWithPassword({ email, password }));
   },
+  /* Connexion par code email (OTP à 6 chiffres, gratuit, sans mot de passe).
+     Étape 1 : envoyer le code. shouldCreateUser=false pour ne pas créer de
+     compte fantôme si l'email est inconnu — on veut juste connecter un compte
+     existant. Si tu veux autoriser l'inscription par code, passe-le à true. */
+  async sendEmailOtp({ email, allowSignup = false }) {
+    return ok(await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: allowSignup },
+    }));
+  },
+  /* Étape 2 : vérifier le code saisi et ouvrir la session. */
+  async verifyEmailOtp({ email, token }) {
+    return ok(await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    }));
+  },
   async signOut() { return ok(await supabase.auth.signOut()); },
   async me() {
     const { data: { user } } = await supabase.auth.getUser();

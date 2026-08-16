@@ -30,7 +30,7 @@ const ROLES = [
 ];
 
 export default function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "otp"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -38,9 +38,13 @@ export default function AuthScreen({ onAuthenticated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
+  // OTP par email
+  const [otpSent, setOtpSent] = useState(false); // false = étape email, true = étape code
+  const [otpCode, setOtpCode] = useState("");
 
   const submit = async () => {
     setError(null); setInfo(null);
+    if (mode === "otp") return; // le mode OTP a ses propres boutons
     if (!email.trim() || !password) { setError("Renseignez votre email et votre mot de passe."); return; }
     if (mode === "signup" && !fullName.trim()) { setError("Indiquez votre nom."); return; }
     if (password.length < 6) { setError("Le mot de passe doit faire au moins 6 caractères."); return; }
@@ -68,6 +72,45 @@ export default function AuthScreen({ onAuthenticated }) {
     }
   };
 
+  // OTP email — étape 1 : envoyer le code à 6 chiffres
+  const sendOtp = async () => {
+    setError(null); setInfo(null);
+    if (!email.trim()) { setError("Renseignez votre email."); return; }
+    setLoading(true);
+    try {
+      await auth.sendEmailOtp({ email: email.trim() });
+      setOtpSent(true);
+      setInfo("Code envoyé. Vérifiez votre boîte mail (et les spams) puis saisissez-le ci-dessous.");
+    } catch (e) {
+      const msg = (e && e.message) || "Une erreur est survenue.";
+      // shouldCreateUser=false : email inconnu => Supabase renvoie souvent une erreur générique
+      if (/signups? not allowed|user not found|not found/i.test(msg)) {
+        setError("Aucun compte n'est associé à cet email. Créez d'abord un compte.");
+      } else setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // OTP email — étape 2 : vérifier le code et ouvrir la session
+  const verifyOtp = async () => {
+    setError(null); setInfo(null);
+    const code = otpCode.replace(/\s/g, "");
+    if (!code || code.length < 6) { setError("Saisissez le code à 6 chiffres reçu par email."); return; }
+    setLoading(true);
+    try {
+      await auth.verifyEmailOtp({ email: email.trim(), token: code });
+      const me = await auth.me();
+      onAuthenticated(me);
+    } catch (e) {
+      const msg = (e && e.message) || "Une erreur est survenue.";
+      if (/expired|invalid|token/i.test(msg)) setError("Code incorrect ou expiré. Renvoyez un code.");
+      else setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: T.paper, color: T.ink, fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -81,12 +124,12 @@ export default function AuthScreen({ onAuthenticated }) {
           <div style={{ fontSize: 12.5, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px" }}>TON BIEN, DANS TA MAIN.</div>
         </div>
 
-        {/* onglets connexion / inscription */}
+        {/* onglets connexion / inscription / code par email */}
         <div style={{ display: "flex", gap: 8, background: T.tealSoft, borderRadius: 14, padding: 5, marginTop: 28 }}>
-          {[["signin", "Connexion"], ["signup", "Créer un compte"]].map(([k, l]) => (
-            <button key={k} onClick={() => { setMode(k); setError(null); setInfo(null); }}
-              style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", cursor: "pointer",
-                fontFamily: "inherit", fontWeight: 700, fontSize: 14,
+          {[["signin", "Connexion"], ["signup", "Créer un compte"], ["otp", "Code email"]].map(([k, l]) => (
+            <button key={k} onClick={() => { setMode(k); setError(null); setInfo(null); setOtpSent(false); setOtpCode(""); }}
+              style={{ flex: 1, padding: "10px 6px", borderRadius: 10, border: "none", cursor: "pointer",
+                fontFamily: "inherit", fontWeight: 700, fontSize: 13.5,
                 background: mode === k ? T.card : "transparent", color: mode === k ? T.teal : T.mut }}>
               {l}
             </button>
@@ -125,20 +168,50 @@ export default function AuthScreen({ onAuthenticated }) {
           )}
 
           <Field label="Email">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" style={inp} autoComplete="email" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vous@exemple.com" style={inp} autoComplete="email" disabled={mode === "otp" && otpSent} />
           </Field>
-          <Field label="Mot de passe">
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Au moins 6 caractères" style={inp} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
-          </Field>
+          {mode !== "otp" && (
+            <Field label="Mot de passe">
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Au moins 6 caractères" style={inp} autoComplete={mode === "signup" ? "new-password" : "current-password"} />
+            </Field>
+          )}
+          {mode === "otp" && otpSent && (
+            <Field label="Code reçu par email">
+              <input inputMode="numeric" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="6 chiffres" style={{ ...inp, letterSpacing: "6px", fontSize: 20, textAlign: "center" }} autoComplete="one-time-code" maxLength={6} />
+            </Field>
+          )}
 
           {error && <div style={{ background: T.late + "18", color: T.late, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{error}</div>}
           {info && <div style={{ background: T.tealSoft, color: T.teal, borderRadius: 12, padding: "10px 14px", fontSize: 13.5, fontWeight: 600 }}>{info}</div>}
 
-          <button onClick={submit} disabled={loading} style={{
-            background: T.teal, color: "#fff", border: "none", borderRadius: 12, padding: 15,
-            fontWeight: 700, fontSize: 16, cursor: loading ? "default" : "pointer", fontFamily: "inherit", opacity: loading ? 0.6 : 1 }}>
-            {loading ? "Un instant…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
-          </button>
+          {mode === "otp" ? (
+            !otpSent ? (
+              <button onClick={sendOtp} disabled={loading} style={{
+                background: T.teal, color: "#fff", border: "none", borderRadius: 12, padding: 15,
+                fontWeight: 700, fontSize: 16, cursor: loading ? "default" : "pointer", fontFamily: "inherit", opacity: loading ? 0.6 : 1 }}>
+                {loading ? "Un instant…" : "Recevoir un code"}
+              </button>
+            ) : (
+              <>
+                <button onClick={verifyOtp} disabled={loading} style={{
+                  background: T.teal, color: "#fff", border: "none", borderRadius: 12, padding: 15,
+                  fontWeight: 700, fontSize: 16, cursor: loading ? "default" : "pointer", fontFamily: "inherit", opacity: loading ? 0.6 : 1 }}>
+                  {loading ? "Vérification…" : "Valider le code"}
+                </button>
+                <button onClick={sendOtp} disabled={loading} style={{
+                  background: "transparent", color: T.teal, border: "none", padding: 4,
+                  fontWeight: 600, fontSize: 13.5, cursor: loading ? "default" : "pointer", fontFamily: "inherit" }}>
+                  Je n'ai rien reçu — renvoyer un code
+                </button>
+              </>
+            )
+          ) : (
+            <button onClick={submit} disabled={loading} style={{
+              background: T.teal, color: "#fff", border: "none", borderRadius: 12, padding: 15,
+              fontWeight: 700, fontSize: 16, cursor: loading ? "default" : "pointer", fontFamily: "inherit", opacity: loading ? 0.6 : 1 }}>
+              {loading ? "Un instant…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
+            </button>
+          )}
         </div>
       </div>
     </div>
