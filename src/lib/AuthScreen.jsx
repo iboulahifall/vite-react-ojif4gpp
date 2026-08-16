@@ -77,8 +77,8 @@ export default function AuthScreen({ onAuthenticated }) {
       <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 18px 40px" }}>
         <div style={{ textAlign: "center", paddingTop: 44 }}>
           <KerMark size={56} />
-          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: "2px", marginTop: 10 }}>KËR</div>
-          <div style={{ fontSize: 12.5, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px" }}>VOTRE BIEN. VOTRE CONTRÔLE.</div>
+          <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: "2px", marginTop: 10 }}>WALLU</div>
+          <div style={{ fontSize: 12.5, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px" }}>TON BIEN, DANS TA MAIN.</div>
         </div>
 
         {/* onglets connexion / inscription */}
