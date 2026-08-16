@@ -478,6 +478,57 @@ export const inspections = {
     if (error) return null;
     return data.signedUrl;
   },
+
+  // ----- MODÈLE PRÉ-REMPLI -----
+  // Génère d'un coup les pièces + éléments standards d'un logement.
+  // Ne fait rien si l'inspection a déjà des pièces (évite les doublons).
+  async applyTemplate(inspectionId) {
+    // Le modèle : chaque pièce avec ses éléments (kind 'etat' par défaut).
+    const TEMPLATE = [
+      { name: "Entrée / Couloir", items: ["Porte d'entrée", "Serrure", "Murs", "Sol", "Plafond", "Interrupteurs", "Éclairage"] },
+      { name: "Salon", items: ["Murs", "Sol", "Plafond", "Fenêtres", "Volets / rideaux", "Prises électriques", "Interrupteurs", "Éclairage", "Climatiseur / ventilateur"] },
+      { name: "Chambre", items: ["Murs", "Sol", "Plafond", "Fenêtres", "Volets", "Placard / penderie", "Prises électriques", "Interrupteurs", "Éclairage", "Climatiseur / ventilateur"] },
+      { name: "Cuisine", items: ["Murs", "Sol", "Plafond", "Évier", "Robinetterie", "Plan de travail", "Placards", "Plaques de cuisson", "Prises électriques", "Éclairage", "Évacuation eaux"] },
+      { name: "Salle de bain / WC", items: ["Murs", "Sol", "Lavabo", "Robinetterie", "Douche / baignoire", "WC", "Chasse d'eau", "Miroir", "Ventilation", "Éclairage"] },
+      { name: "Extérieur / Commun", items: ["Cour", "Portail", "Mur de clôture", "Façade", "Toiture"] },
+    ];
+    // Éléments spéciaux (compteurs + clés) regroupés dans une pièce "Général".
+    const GENERAL = {
+      name: "Compteurs & clés",
+      special: [
+        { label: "Compteur électricité", kind: "compteur", unit: "kWh" },
+        { label: "Compteur eau", kind: "compteur", unit: "m³" },
+        { label: "Clés remises", kind: "cle" },
+      ],
+    };
+
+    // Sécurité : ne pas dupliquer si déjà des pièces
+    const existing = ok(await supabase.from("inspection_rooms").select("id").eq("inspection_id", inspectionId));
+    if (existing && existing.length > 0) return { skipped: true };
+
+    let pos = 0;
+    // 1) crée les pièces standards + leurs éléments
+    for (const room of TEMPLATE) {
+      const r = ok(await supabase.from("inspection_rooms")
+        .insert({ inspection_id: inspectionId, name: room.name, position: pos++ })
+        .select().single());
+      const rows = room.items.map((label, i) => ({
+        room_id: r.id, label, item_kind: "etat", position: i,
+      }));
+      if (rows.length) ok(await supabase.from("inspection_items").insert(rows));
+    }
+    // 2) crée la pièce "Compteurs & clés" avec les éléments spéciaux
+    const g = ok(await supabase.from("inspection_rooms")
+      .insert({ inspection_id: inspectionId, name: GENERAL.name, position: pos++ })
+      .select().single());
+    const grows = GENERAL.special.map((s, i) => ({
+      room_id: g.id, label: s.label, item_kind: s.kind,
+      meter_unit: s.unit || null, position: i,
+    }));
+    ok(await supabase.from("inspection_items").insert(grows));
+
+    return { skipped: false };
+  },
 };
 
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */

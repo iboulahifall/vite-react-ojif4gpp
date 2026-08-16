@@ -246,6 +246,14 @@
        } catch (e) { setError((e && e.message) || "Suppression impossible."); }
      };
    
+     const [applying, setApplying] = useState(false);
+     const onApplyTemplate = async () => {
+       setApplying(true);
+       try { await api.applyTemplate(inspectionId); await load(); }
+       catch (e) { setError((e && e.message) || "Impossible de générer le modèle."); }
+       setApplying(false);
+     };
+   
      if (!data) return (
        <div style={{ paddingTop: 16 }}>
          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -285,7 +293,10 @@
          {data.rooms.length === 0 && (
            <div style={emptyBox}>
              <div style={{ fontWeight: 700, color: C.ink }}>Aucune pièce</div>
-             <div style={{ fontSize: 13, color: C.mut, marginTop: 4 }}>Ajoutez les pièces à contrôler (salon, cuisine, chambre…).</div>
+             <div style={{ fontSize: 13, color: C.mut, marginTop: 4, marginBottom: 14 }}>Ajoutez les pièces une par une, ou générez un modèle standard complet.</div>
+             <button onClick={onApplyTemplate} disabled={applying} style={{ ...primaryBtn, opacity: applying ? 0.6 : 1 }}>
+               {applying ? "Génération…" : "✨ Utiliser le modèle standard"}
+             </button>
            </div>
          )}
    
@@ -340,7 +351,7 @@
            )}
            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, color: C.teal, fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
              <Plus size={15} /> {attaching ? "Envoi…" : "Ajouter un document"}
-             <input type="file" accept="application/pdf,image/*" multiple onChange={onAddAttachment} style={{ display: "none" }} />
+             <input type="file" accept=".pdf,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,*/*" multiple onChange={onAddAttachment} style={{ display: "none" }} />
            </label>
          </div>
    
