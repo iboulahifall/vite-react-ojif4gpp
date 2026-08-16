@@ -450,6 +450,34 @@ export const inspections = {
     if (error) return null;
     return data.signedUrl;
   },
+
+  // ----- DOCUMENTS JOINTS (PDF et autres fichiers) -----
+  // Uploade un fichier joint (PDF, image, doc...) dans le bucket "documents".
+  async uploadAttachment(rawFile) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifié");
+    // On ne compresse pas les fichiers non-image (ex : PDF) — envoi tel quel.
+    let file = rawFile;
+    if (rawFile && rawFile.type && rawFile.type.startsWith("image/")) {
+      file = await compressImage(rawFile);
+    }
+    const safe = (file.name || "fichier").replace(/[^\w.\-]/g, "_");
+    const path = user.id + "/inspections-docs/" + Date.now() + "-" + safe;
+    const { data, error } = await supabase.storage.from("documents").upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    return { path: data.path, name: file.name || safe };
+  },
+  // Met à jour la liste des fichiers joints d'une inspection.
+  async setAttachments(inspectionId, attachments) {
+    return ok(await supabase.from("inspections").update({ attachments }).eq("id", inspectionId).select().single());
+  },
+  // Lien signé pour ouvrir un fichier joint.
+  async attachmentUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 3600);
+    if (error) return null;
+    return data.signedUrl;
+  },
 };
 
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */

@@ -5,7 +5,7 @@
    import React, { useState, useEffect } from "react";
    import { inspections as api } from "./lib/data.js";
    import {
-     ChevronLeft, Plus, Trash2, ClipboardCheck, LogIn, LogOut, Repeat, Calendar,
+     ChevronLeft, Plus, Trash2, ClipboardCheck, LogIn, LogOut, Repeat, Calendar, FileText,
    } from "lucide-react";
    
    /* Couleurs WALLU (alignées sur le thème de l'app) */
@@ -163,6 +163,7 @@
      const [addingRoom, setAddingRoom] = useState(false);
      const [addItemFor, setAddItemFor] = useState(null);  // room object
      const [editItem, setEditItem] = useState(null);      // item object
+     const [attaching, setAttaching] = useState(false);   // upload en cours
    
      const load = async () => {
        try { setData(await api.detail(inspectionId)); }
@@ -209,6 +210,40 @@
      const setStatus = async (status) => {
        try { await api.update(inspectionId, { status }); await load(); }
        catch (e) { setError((e && e.message) || "Impossible de changer le statut."); }
+     };
+   
+     const onAddAttachment = async (e) => {
+       const files = Array.from(e.target.files || []);
+       if (!files.length) return;
+       setAttaching(true);
+       try {
+         const current = (data && data.attachments) || [];
+         const added = [];
+         for (const f of files) {
+           const res = await api.uploadAttachment(f);
+           // on stocke "chemin|nom" pour garder le nom lisible du fichier
+           added.push(res.path + "|" + res.name);
+         }
+         await api.setAttachments(inspectionId, [...current, ...added]);
+         await load();
+       } catch (err) { setError((err && err.message) || "Impossible de joindre le fichier."); }
+       setAttaching(false);
+     };
+   
+     const onOpenAttachment = async (entry) => {
+       const path = entry.split("|")[0];
+       try {
+         const url = await api.attachmentUrl(path);
+         if (url) window.open(url, "_blank");
+       } catch (e) { setError("Impossible d'ouvrir le fichier."); }
+     };
+   
+     const onRemoveAttachment = async (entry) => {
+       try {
+         const current = (data && data.attachments) || [];
+         await api.setAttachments(inspectionId, current.filter((a) => a !== entry));
+         await load();
+       } catch (e) { setError((e && e.message) || "Suppression impossible."); }
      };
    
      if (!data) return (
@@ -284,6 +319,30 @@
          <button onClick={() => setAddingRoom(true)} style={{ ...primaryBtn, marginTop: 4, marginBottom: 10 }}>
            <Plus size={16} style={{ verticalAlign: "-3px" }} /> Ajouter une pièce
          </button>
+   
+         {/* documents joints (PDF et autres) */}
+         <div style={{ background: C.card, border: "1px solid " + C.line, borderRadius: 14, padding: "12px 14px", marginBottom: 12 }}>
+           <div style={{ fontWeight: 700, fontSize: 14.5, color: C.ink, marginBottom: 10 }}>Documents joints</div>
+           {(data.attachments && data.attachments.length > 0) ? (
+             data.attachments.map((entry, i) => {
+               const name = entry.split("|")[1] || "Document";
+               return (
+                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid " + C.line }}>
+                   <button onClick={() => onOpenAttachment(entry)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left", color: C.teal, fontSize: 13.5, fontWeight: 600 }}>
+                     <FileText size={16} /> {name}
+                   </button>
+                   <button onClick={() => onRemoveAttachment(entry)} style={{ border: "none", background: "transparent", color: C.bad, cursor: "pointer", padding: 4 }} title="Retirer"><Trash2 size={14} /></button>
+                 </div>
+               );
+             })
+           ) : (
+             <div style={{ fontSize: 12.5, color: C.mut, marginBottom: 10 }}>Aucun document. Joignez un PDF (ancien état des lieux, contrat…).</div>
+           )}
+           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, color: C.teal, fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
+             <Plus size={15} /> {attaching ? "Envoi…" : "Ajouter un document"}
+             <input type="file" accept="application/pdf,image/*" multiple onChange={onAddAttachment} style={{ display: "none" }} />
+           </label>
+         </div>
    
          {/* statut : finaliser */}
          {data.status !== "finalise" && data.status !== "signe" && data.rooms.length > 0 && (
