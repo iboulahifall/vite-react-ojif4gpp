@@ -2,13 +2,14 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useWalluData, REAL } from "./lib/useWalluData.js";
 import AuthScreen from "./lib/AuthScreen.jsx";
 import { InspectionsList, InspectionDetail } from "./Inspections.jsx";
+import { DocumentScanner } from "./Scanner.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
   Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2, Bell,
   CircleDot, ArrowRight, X, FileText, Download, Users,
   Droplet, Zap, ShowerHead, DoorClosed, Snowflake, MoreHorizontal,
   Camera, MessageCircle, Copy, Check, UserPlus, LogOut,
-  ClipboardList, ClipboardCheck, BarChart3, ShieldCheck, AlertTriangle, Settings,
+  ClipboardList, ClipboardCheck, ScanLine, BarChart3, ShieldCheck, AlertTriangle, Settings,
   FolderOpen, File, Image as ImageIcon, Search, Upload, Check as CheckIcon, MapPin, KeyRound
 } from "lucide-react";
 
@@ -497,6 +498,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} onInspect={(unit, propId) => setView({ name: "inspections", unitId: unit.id, unitLabel: unit.label, propId })} />}
       {view.name === "inspections" && <InspectionsList unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} openDetail={(inspId) => setView({ name: "inspection", inspId, unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
       {view.name === "inspection" && <InspectionDetail inspectionId={view.inspId} back={() => setView({ name: "inspections", unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
+      {view.name === "scanner" && <DocumentScanner back={() => setView({ name: "dashboard" })} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} onDelete={onDeleteExpense} onOpenReceipt={onOpenDocument} />}
@@ -615,6 +617,7 @@ function OwnerDashboard({ db, props, stats, go, logout }) {
         <BigButton icon={Wrench} label="Problemes" sub={stats.problems + " ouvert" + (stats.problems>1?"s":"")} tint={T.late} onClick={() => go({ name: "problems" })} />
         <BigButton icon={Receipt} label="Depenses" sub={stats.toValidate > 0 ? stats.toValidate + " a valider" : "A jour"} tint={T.sun} onClick={() => go({ name: "expenses" })} />
         <BigButton icon={BarChart3} label="Rapport mensuel" sub="Resume automatique" tint={T.prog} onClick={() => go({ name: "report" })} />
+        <BigButton icon={ScanLine} label="Scanner un document" sub="Extraire le texte (OCR)" tint={T.teal} onClick={() => go({ name: "scanner" })} />
       </div>
     </div>
   );
