@@ -3,7 +3,7 @@ import { Building2, ClipboardList, Home as HomeIcon } from "lucide-react";
 import { auth } from "./data.js";
 
 /* ============================================================
-   KËR — Écran d'authentification (email + mot de passe)
+   WALLU — Écran d'authentification (email + mot de passe)
    Utilisé uniquement en mode réel (clés Supabase présentes).
    Gère : connexion, inscription (avec choix du rôle), erreurs.
    ============================================================ */
@@ -14,9 +14,9 @@ const T = {
   line: "#E6E0D2", mut: "#5E6B66", late: "#D2493B",
 };
 
-function KerMark({ size = 56 }) {
+function WalluMark({ size = 56 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: "inline-block" }} aria-label="KËR">
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: "inline-block" }} aria-label="WALLU">
       <path d="M 18 60 L 50 26 L 82 60" fill="none" stroke={T.teal} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M 18 78 L 50 44 L 82 78" fill="none" stroke={T.sun} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -76,7 +76,7 @@ export default function AuthScreen({ onAuthenticated }) {
 
       <div style={{ maxWidth: 420, margin: "0 auto", padding: "0 18px 40px" }}>
         <div style={{ textAlign: "center", paddingTop: 44 }}>
-          <KerMark size={56} />
+          <WalluMark size={56} />
           <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: "2px", marginTop: 10 }}>WALLU</div>
           <div style={{ fontSize: 12.5, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px" }}>TON BIEN, DANS TA MAIN.</div>
         </div>
