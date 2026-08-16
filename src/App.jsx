@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useWalluData, REAL } from "./lib/useWalluData.js";
 import AuthScreen from "./lib/AuthScreen.jsx";
-import { InspectionsList } from "./Inspections.jsx";
+import { InspectionsList, InspectionDetail } from "./Inspections.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
   Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2, Bell,
@@ -496,7 +496,7 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} onAdd={() => setAddProp(true)} />}
       {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} onInspect={(unit, propId) => setView({ name: "inspections", unitId: unit.id, unitLabel: unit.label, propId })} />}
       {view.name === "inspections" && <InspectionsList unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} openDetail={(inspId) => setView({ name: "inspection", inspId, unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
-      {view.name === "inspection" && <Screen title="État des lieux" sub="Le détail (pièces & éléments) arrive au prochain lot" back={() => setView({ name: "inspections", unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })}><div style={{ ...card, textAlign: "center", color: T.mut }}>Inspection créée. L'écran de remplissage (pièces, éléments, photos) sera ajouté au Lot 2b.</div></Screen>}
+      {view.name === "inspection" && <InspectionDetail inspectionId={view.inspId} back={() => setView({ name: "inspections", unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
       {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} onDelete={onDeleteExpense} onOpenReceipt={onOpenDocument} />}

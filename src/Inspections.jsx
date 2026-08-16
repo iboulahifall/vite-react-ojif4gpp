@@ -156,6 +156,333 @@
      );
    }
    
+   /* Écran : détail d'une inspection — pièces, éléments, saisie */
+   export function InspectionDetail({ inspectionId, back }) {
+     const [data, setData] = useState(null);
+     const [error, setError] = useState(null);
+     const [addingRoom, setAddingRoom] = useState(false);
+     const [addItemFor, setAddItemFor] = useState(null);  // room object
+     const [editItem, setEditItem] = useState(null);      // item object
+   
+     const load = async () => {
+       try { setData(await api.detail(inspectionId)); }
+       catch (e) { setError((e && e.message) || "Erreur de chargement."); }
+     };
+     useEffect(() => { load(); }, [inspectionId]);
+   
+     const totalItems = data ? data.rooms.reduce((n, r) => n + r.items.length, 0) : 0;
+     const notedItems = data ? data.rooms.reduce((n, r) => n + r.items.filter(isNoted).length, 0) : 0;
+   
+     const onAddRoom = async (name) => {
+       try {
+         const pos = data ? data.rooms.length : 0;
+         await api.addRoom(inspectionId, name, pos);
+         setAddingRoom(false);
+         await load();
+       } catch (e) { setError((e && e.message) || "Impossible d'ajouter la pièce."); }
+     };
+   
+     const onRemoveRoom = async (roomId) => {
+       try { await api.removeRoom(roomId); await load(); }
+       catch (e) { setError((e && e.message) || "Suppression impossible."); }
+     };
+   
+     const onAddItem = async (room, { label, itemKind }) => {
+       try {
+         const pos = room.items.length;
+         await api.addItem(room.id, { label, itemKind, position: pos });
+         setAddItemFor(null);
+         await load();
+       } catch (e) { setError((e && e.message) || "Impossible d'ajouter l'élément."); }
+     };
+   
+     const onRemoveItem = async (itemId) => {
+       try { await api.removeItem(itemId); await load(); }
+       catch (e) { setError((e && e.message) || "Suppression impossible."); }
+     };
+   
+     const onSaveItem = async (itemId, patch) => {
+       try { await api.updateItem(itemId, patch); setEditItem(null); await load(); }
+       catch (e) { setError((e && e.message) || "Enregistrement impossible."); }
+     };
+   
+     const setStatus = async (status) => {
+       try { await api.update(inspectionId, { status }); await load(); }
+       catch (e) { setError((e && e.message) || "Impossible de changer le statut."); }
+     };
+   
+     if (!data) return (
+       <div style={{ paddingTop: 16 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+           {back && <button onClick={back} style={iconBtn}><ChevronLeft size={20} /></button>}
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: C.ink }}>État des lieux</div>
+         </div>
+         {error ? <div style={errorBox}>{error}</div> : <div style={{ color: C.mut, fontSize: 14, padding: "20px 0" }}>Chargement…</div>}
+       </div>
+     );
+   
+     const typeLabel = TYPE_LABEL[data.type] || "Inspection";
+   
+     return (
+       <div style={{ paddingTop: 16 }}>
+         {/* en-tête */}
+         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+           {back && <button onClick={back} style={iconBtn}><ChevronLeft size={20} /></button>}
+           <div style={{ flex: 1 }}>
+             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, lineHeight: 1.15 }}>{data.title || typeLabel}</div>
+             <div style={{ fontSize: 12.5, color: C.mut }}>{typeLabel} · {fmtDate(data.performed_at || data.created_at)}</div>
+           </div>
+           <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, color: "#fff", background: STATUS_COLOR[data.status] || C.mut }}>
+             {STATUS_LABEL[data.status] || data.status}
+           </span>
+         </div>
+   
+         {error && <div style={errorBox}>{error}</div>}
+   
+         {/* stats */}
+         <div style={{ display: "flex", gap: 16, background: C.card, border: "1px solid " + C.line, borderRadius: 12, padding: "10px 14px", marginBottom: 14 }}>
+           <Stat n={data.rooms.length} l="pièces" />
+           <Stat n={totalItems} l="éléments" />
+           <Stat n={notedItems} l="notés" color={C.good} />
+         </div>
+   
+         {/* pièces */}
+         {data.rooms.length === 0 && (
+           <div style={emptyBox}>
+             <div style={{ fontWeight: 700, color: C.ink }}>Aucune pièce</div>
+             <div style={{ fontSize: 13, color: C.mut, marginTop: 4 }}>Ajoutez les pièces à contrôler (salon, cuisine, chambre…).</div>
+           </div>
+         )}
+   
+         {data.rooms.map((room) => (
+           <div key={room.id} style={{ background: C.card, border: "1px solid " + C.line, borderRadius: 14, marginBottom: 12, overflow: "hidden" }}>
+             <div style={{ display: "flex", alignItems: "center", padding: "11px 14px", borderBottom: room.items.length ? "1px solid " + C.line : "none" }}>
+               <div style={{ flex: 1, fontWeight: 700, fontSize: 15, color: C.ink }}>{room.name}</div>
+               <span style={{ fontSize: 12, color: C.mut, marginRight: 8 }}>{room.items.length} élément{room.items.length > 1 ? "s" : ""}</span>
+               <button onClick={() => onRemoveRoom(room.id)} style={{ border: "none", background: "transparent", color: C.bad, cursor: "pointer", padding: 4 }} title="Supprimer la pièce"><Trash2 size={15} /></button>
+             </div>
+   
+             {room.items.map((it) => (
+               <button key={it.id} onClick={() => setEditItem(it)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: "1px solid " + C.line, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                 <span style={{ flex: 1 }}>
+                   <span style={{ display: "block", fontSize: 14, color: C.ink }}>{it.label}</span>
+                   {it.comment && <span style={{ display: "block", fontSize: 12, color: C.mut, marginTop: 1 }}>{it.comment}</span>}
+                   {it.item_kind === "compteur" && it.meter_value != null && <span style={{ display: "block", fontSize: 12, color: C.mut, marginTop: 1 }}>{it.meter_value} {it.meter_unit || ""}</span>}
+                   {it.item_kind === "cle" && it.count_value != null && <span style={{ display: "block", fontSize: 12, color: C.mut, marginTop: 1 }}>{it.count_value} clé{it.count_value > 1 ? "s" : ""}</span>}
+                 </span>
+                 {it.item_kind === "etat" && <ConditionBadge condition={it.condition} />}
+                 {(it.photo_urls && it.photo_urls.length > 0) && <span style={{ fontSize: 12, color: C.mut }}>{it.photo_urls.length} 📷</span>}
+               </button>
+             ))}
+   
+             <button onClick={() => setAddItemFor(room)} style={{ width: "100%", padding: "10px 14px", background: "transparent", border: "none", color: C.teal, fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+               <Plus size={14} style={{ verticalAlign: "-2px" }} /> Ajouter un élément
+             </button>
+           </div>
+         ))}
+   
+         <button onClick={() => setAddingRoom(true)} style={{ ...primaryBtn, marginTop: 4, marginBottom: 10 }}>
+           <Plus size={16} style={{ verticalAlign: "-3px" }} /> Ajouter une pièce
+         </button>
+   
+         {/* statut : finaliser */}
+         {data.status !== "finalise" && data.status !== "signe" && data.rooms.length > 0 && (
+           <button onClick={() => setStatus("finalise")} style={{ width: "100%", background: C.good, color: "#fff", border: "none", borderRadius: 12, padding: 14, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit", marginBottom: 30 }}>
+             Finaliser l'état des lieux
+           </button>
+         )}
+         {(data.status === "finalise" || data.status === "signe") && (
+           <button onClick={() => setStatus("en_cours")} style={{ width: "100%", background: "transparent", color: C.mut, border: "1px solid " + C.line, borderRadius: 12, padding: 12, fontWeight: 600, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", marginBottom: 30 }}>
+             Rouvrir pour modifier
+           </button>
+         )}
+   
+         {addingRoom && <AddRoomSheet onAdd={onAddRoom} close={() => setAddingRoom(false)} />}
+         {addItemFor && <AddItemSheet room={addItemFor} onAdd={onAddItem} close={() => setAddItemFor(null)} />}
+         {editItem && <ItemEditor item={editItem} onSave={onSaveItem} onRemove={onRemoveItem} close={() => setEditItem(null)} />}
+       </div>
+     );
+   }
+   
+   /* Un élément est "noté" s'il a un état renseigné, un relevé, ou un nombre */
+   function isNoted(it) {
+     if (it.item_kind === "compteur") return it.meter_value != null;
+     if (it.item_kind === "cle") return it.count_value != null;
+     return it.condition && it.condition !== "non_verifie";
+   }
+   
+   function Stat({ n, l, color }) {
+     return (
+       <div><span style={{ fontSize: 19, fontWeight: 800, color: color || C.ink }}>{n}</span><span style={{ fontSize: 12, color: C.mut }}> {l}</span></div>
+     );
+   }
+   
+   const COND_LABEL = { neuf: "Neuf", bon: "Bon", moyen: "Moyen", mauvais: "Mauvais", absent: "Absent", non_verifie: "Non vérifié" };
+   const COND_STYLE = {
+     neuf: { bg: "#E1F5EE", fg: "#04342C" }, bon: { bg: "#E1F5EE", fg: "#0F6E56" },
+     moyen: { bg: "#FAEEDA", fg: "#854F0B" }, mauvais: { bg: "#FCEBEB", fg: "#A32D2D" },
+     absent: { bg: "#F1EFE8", fg: "#5F5E5A" }, non_verifie: { bg: "#F1EFE8", fg: "#888780" },
+   };
+   function ConditionBadge({ condition }) {
+     const s = COND_STYLE[condition] || COND_STYLE.non_verifie;
+     return <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, background: s.bg, color: s.fg }}>{COND_LABEL[condition] || condition}</span>;
+   }
+   
+   /* Feuille : ajouter une pièce */
+   function AddRoomSheet({ onAdd, close }) {
+     const [name, setName] = useState("");
+     const [busy, setBusy] = useState(false);
+     const SUGGEST = ["Salon", "Cuisine", "Chambre", "Salle de bain", "WC", "Entrée", "Couloir", "Extérieur"];
+     const submit = async () => { if (!name.trim()) return; setBusy(true); await onAdd(name.trim()); setBusy(false); };
+     return (
+       <div onClick={close} style={overlay}>
+         <div onClick={(e) => e.stopPropagation()} style={sheet}>
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Ajouter une pièce</div>
+           <div style={label}>Nom de la pièce</div>
+           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Salon" style={input} />
+           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+             {SUGGEST.map((s) => (
+               <button key={s} onClick={() => setName(s)} style={{ border: "1px solid " + C.line, background: C.card, borderRadius: 20, padding: "5px 11px", fontSize: 12.5, color: C.ink, cursor: "pointer", fontFamily: "inherit" }}>{s}</button>
+             ))}
+           </div>
+           <button onClick={submit} disabled={busy} style={{ ...primaryBtn, marginTop: 18, opacity: busy ? 0.6 : 1 }}>{busy ? "Ajout…" : "Ajouter"}</button>
+         </div>
+       </div>
+     );
+   }
+   
+   /* Feuille : ajouter un élément à une pièce */
+   function AddItemSheet({ room, onAdd, close }) {
+     const [label, setLabelV] = useState("");
+     const [kind, setKind] = useState("etat");
+     const [busy, setBusy] = useState(false);
+     const SUGGEST = ["Murs", "Sol", "Plafond", "Fenêtres", "Porte", "Prises électriques", "Interrupteurs", "Éclairage"];
+     const submit = async () => { if (!label.trim()) return; setBusy(true); await onAdd(room, { label: label.trim(), itemKind: kind }); setBusy(false); };
+     return (
+       <div onClick={close} style={overlay}>
+         <div onClick={(e) => e.stopPropagation()} style={sheet}>
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 4 }}>Ajouter un élément</div>
+           <div style={{ fontSize: 13, color: C.mut, marginBottom: 14 }}>Pièce : {room.name}</div>
+   
+           <div style={label}>Type</div>
+           <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+             {[["etat", "État"], ["compteur", "Compteur"], ["cle", "Clés"]].map(([k, l]) => {
+               const on = kind === k;
+               return <button key={k} onClick={() => setKind(k)} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "2px solid " + (on ? C.teal : C.line), background: on ? C.tealSoft : C.card, color: on ? C.teal : C.mut, fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{l}</button>;
+             })}
+           </div>
+   
+           <div style={label}>Nom de l'élément</div>
+           <input value={label} onChange={(e) => setLabelV(e.target.value)} placeholder={kind === "compteur" ? "Ex : Compteur électricité" : kind === "cle" ? "Ex : Clés remises" : "Ex : Murs"} style={input} />
+           {kind === "etat" && (
+             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+               {SUGGEST.map((s) => (
+                 <button key={s} onClick={() => setLabelV(s)} style={{ border: "1px solid " + C.line, background: C.card, borderRadius: 20, padding: "5px 11px", fontSize: 12.5, color: C.ink, cursor: "pointer", fontFamily: "inherit" }}>{s}</button>
+               ))}
+             </div>
+           )}
+   
+           <button onClick={submit} disabled={busy} style={{ ...primaryBtn, marginTop: 18, opacity: busy ? 0.6 : 1 }}>{busy ? "Ajout…" : "Ajouter"}</button>
+         </div>
+       </div>
+     );
+   }
+   
+   /* Éditeur d'un élément : état/commentaire/photos, ou compteur, ou clés */
+   function ItemEditor({ item, onSave, onRemove, close }) {
+     const [condition, setCondition] = useState(item.condition || "non_verifie");
+     const [comment, setComment] = useState(item.comment || "");
+     const [photos, setPhotos] = useState(item.photo_urls || []);
+     const [meterValue, setMeterValue] = useState(item.meter_value != null ? String(item.meter_value) : "");
+     const [meterUnit, setMeterUnit] = useState(item.meter_unit || (item.label.toLowerCase().includes("eau") ? "m³" : "kWh"));
+     const [countValue, setCountValue] = useState(item.count_value != null ? String(item.count_value) : "");
+     const [busy, setBusy] = useState(false);
+     const [uploading, setUploading] = useState(false);
+   
+     const onPickPhoto = async (e) => {
+       const files = Array.from(e.target.files || []);
+       if (!files.length) return;
+       setUploading(true);
+       try {
+         const paths = [];
+         for (const f of files) { paths.push(await api.uploadPhoto(f)); }
+         setPhotos((prev) => [...prev, ...paths]);
+       } catch (err) { /* silencieux : on garde ce qui a marché */ }
+       setUploading(false);
+     };
+     const removePhoto = (i) => setPhotos((prev) => prev.filter((_, k) => k !== i));
+   
+     const save = async () => {
+       setBusy(true);
+       const patch = { comment, photoUrls: photos };
+       if (item.item_kind === "etat") patch.condition = condition;
+       if (item.item_kind === "compteur") { patch.meterValue = meterValue === "" ? null : Number(meterValue); patch.meterUnit = meterUnit; }
+       if (item.item_kind === "cle") patch.countValue = countValue === "" ? null : parseInt(countValue, 10);
+       await onSave(item.id, patch);
+       setBusy(false);
+     };
+   
+     return (
+       <div onClick={close} style={overlay}>
+         <div onClick={(e) => e.stopPropagation()} style={sheet}>
+           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink }}>{item.label}</div>
+             <button onClick={() => onRemove(item.id)} style={{ border: "none", background: "transparent", color: C.bad, cursor: "pointer" }} title="Supprimer l'élément"><Trash2 size={17} /></button>
+           </div>
+   
+           {item.item_kind === "etat" && (
+             <>
+               <div style={label}>État constaté</div>
+               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
+                 {["neuf", "bon", "moyen", "mauvais", "absent", "non_verifie"].map((k) => {
+                   const on = condition === k;
+                   const s = COND_STYLE[k];
+                   return <button key={k} onClick={() => setCondition(k)} style={{ padding: "10px", borderRadius: 8, border: "2px solid " + (on ? s.fg : C.line), background: on ? s.bg : C.card, color: on ? s.fg : C.mut, fontWeight: on ? 700 : 500, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{COND_LABEL[k]}</button>;
+                 })}
+               </div>
+             </>
+           )}
+   
+           {item.item_kind === "compteur" && (
+             <>
+               <div style={label}>Relevé</div>
+               <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+                 <input value={meterValue} onChange={(e) => setMeterValue(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Ex : 4521" style={{ ...input, flex: 1 }} />
+                 <input value={meterUnit} onChange={(e) => setMeterUnit(e.target.value)} placeholder="kWh" style={{ ...input, width: 90 }} />
+               </div>
+             </>
+           )}
+   
+           {item.item_kind === "cle" && (
+             <>
+               <div style={label}>Nombre de clés remises</div>
+               <input value={countValue} onChange={(e) => setCountValue(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="Ex : 3" style={{ ...input, marginBottom: 18 }} />
+             </>
+           )}
+   
+           <div style={label}>Commentaire</div>
+           <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} placeholder="Observations…" style={{ ...input, resize: "vertical", marginBottom: 18 }} />
+   
+           <div style={label}>Photos ({photos.length})</div>
+           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+             {photos.map((p, i) => (
+               <div key={i} style={{ position: "relative", width: 72, height: 72, borderRadius: 8, background: "#D3D1C7", display: "grid", placeItems: "center", color: "#5F5E5A", fontSize: 11 }}>
+                 📷
+                 <button onClick={() => removePhoto(i)} style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", background: C.bad, color: "#fff", cursor: "pointer", fontSize: 12, lineHeight: "22px", padding: 0 }}>×</button>
+               </div>
+             ))}
+             <label style={{ width: 72, height: 72, borderRadius: 8, border: "1px dashed " + C.line, display: "grid", placeItems: "center", cursor: "pointer", color: C.mut, fontSize: 11, textAlign: "center" }}>
+               {uploading ? "…" : "+ Photo"}
+               <input type="file" accept="image/*" multiple onChange={onPickPhoto} style={{ display: "none" }} />
+             </label>
+           </div>
+   
+           <button onClick={save} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Enregistrement…" : "Enregistrer"}</button>
+         </div>
+       </div>
+     );
+   }
+   
    /* ---- styles ---- */
    const iconBtn = { width: 38, height: 38, borderRadius: 11, border: "1px solid " + C.line, background: C.card, display: "grid", placeItems: "center", cursor: "pointer", color: C.ink };
    const addBtn = { display: "inline-flex", alignItems: "center", gap: 5, background: C.teal, color: "#fff", border: "none", borderRadius: 10, padding: "9px 13px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" };
