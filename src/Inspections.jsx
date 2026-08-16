@@ -126,7 +126,7 @@
          <div onClick={(e) => e.stopPropagation()} style={sheet}>
            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Nouvel état des lieux</div>
    
-           <div style={label}>Type</div>
+           <div style={fieldLabel}>Type</div>
            <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
              {[["entree", "État des lieux d'entrée", LogIn], ["sortie", "État des lieux de sortie", LogOut], ["periodique", "Inspection périodique", Repeat]].map(([k, l, Icon]) => {
                const on = type === k;
@@ -145,7 +145,7 @@
              })}
            </div>
    
-           <div style={label}>Titre (facultatif)</div>
+           <div style={fieldLabel}>Titre (facultatif)</div>
            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex : Entrée Modou - Mars 2026" style={input} />
    
            <button onClick={submit} disabled={busy} style={{ ...primaryBtn, marginTop: 18, opacity: busy ? 0.6 : 1 }}>
@@ -338,7 +338,7 @@
        <div onClick={close} style={overlay}>
          <div onClick={(e) => e.stopPropagation()} style={sheet}>
            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Ajouter une pièce</div>
-           <div style={label}>Nom de la pièce</div>
+           <div style={fieldLabel}>Nom de la pièce</div>
            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Salon" style={input} />
            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
              {SUGGEST.map((s) => (
@@ -364,7 +364,7 @@
            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 4 }}>Ajouter un élément</div>
            <div style={{ fontSize: 13, color: C.mut, marginBottom: 14 }}>Pièce : {room.name}</div>
    
-           <div style={label}>Type</div>
+           <div style={fieldLabel}>Type</div>
            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
              {[["etat", "État"], ["compteur", "Compteur"], ["cle", "Clés"]].map(([k, l]) => {
                const on = kind === k;
@@ -372,7 +372,7 @@
              })}
            </div>
    
-           <div style={label}>Nom de l'élément</div>
+           <div style={fieldLabel}>Nom de l'élément</div>
            <input value={label} onChange={(e) => setLabelV(e.target.value)} placeholder={kind === "compteur" ? "Ex : Compteur électricité" : kind === "cle" ? "Ex : Clés remises" : "Ex : Murs"} style={input} />
            {kind === "etat" && (
              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
@@ -432,7 +432,7 @@
    
            {item.item_kind === "etat" && (
              <>
-               <div style={label}>État constaté</div>
+               <div style={fieldLabel}>État constaté</div>
                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
                  {["neuf", "bon", "moyen", "mauvais", "absent", "non_verifie"].map((k) => {
                    const on = condition === k;
@@ -445,7 +445,7 @@
    
            {item.item_kind === "compteur" && (
              <>
-               <div style={label}>Relevé</div>
+               <div style={fieldLabel}>Relevé</div>
                <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
                  <input value={meterValue} onChange={(e) => setMeterValue(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Ex : 4521" style={{ ...input, flex: 1 }} />
                  <input value={meterUnit} onChange={(e) => setMeterUnit(e.target.value)} placeholder="kWh" style={{ ...input, width: 90 }} />
@@ -455,15 +455,15 @@
    
            {item.item_kind === "cle" && (
              <>
-               <div style={label}>Nombre de clés remises</div>
+               <div style={fieldLabel}>Nombre de clés remises</div>
                <input value={countValue} onChange={(e) => setCountValue(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="Ex : 3" style={{ ...input, marginBottom: 18 }} />
              </>
            )}
    
-           <div style={label}>Commentaire</div>
+           <div style={fieldLabel}>Commentaire</div>
            <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} placeholder="Observations…" style={{ ...input, resize: "vertical", marginBottom: 18 }} />
    
-           <div style={label}>Photos ({photos.length})</div>
+           <div style={fieldLabel}>Photos ({photos.length})</div>
            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
              {photos.map((p, i) => (
                <div key={i} style={{ position: "relative", width: 72, height: 72, borderRadius: 8, background: "#D3D1C7", display: "grid", placeItems: "center", color: "#5F5E5A", fontSize: 11 }}>
@@ -493,7 +493,7 @@
    const emptyBox = { textAlign: "center", padding: "40px 20px", background: C.card, border: "1px solid " + C.line, borderRadius: 16 };
    const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", display: "grid", placeItems: "end center", zIndex: 50 };
    const sheet = { width: "100%", maxWidth: 440, background: C.paper, borderRadius: "20px 20px 0 0", padding: "22px 18px 30px", maxHeight: "90vh", overflowY: "auto" };
-   const label = { fontSize: 12.5, color: C.mut, fontWeight: 700, marginBottom: 7 };
+   const fieldLabel = { fontSize: 12.5, color: C.mut, fontWeight: 700, marginBottom: 7 };
    const input = { width: "100%", border: "1px solid " + C.line, borderRadius: 11, padding: "12px 14px", fontSize: 15, fontFamily: "inherit", background: C.card, color: C.ink, boxSizing: "border-box" };
    const primaryBtn = { width: "100%", background: C.teal, color: "#fff", border: "none", borderRadius: 12, padding: 15, fontWeight: 700, fontSize: 16, cursor: "pointer", fontFamily: "inherit" };
    
