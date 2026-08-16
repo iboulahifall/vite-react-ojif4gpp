@@ -72,7 +72,7 @@ export default function AuthScreen({ onAuthenticated }) {
     }
   };
 
-  // OTP email — étape 1 : envoyer le code à 6 chiffres
+  // OTP email — étape 1 : envoyer le code (6 à 8 chiffres selon Supabase)
   const sendOtp = async () => {
     setError(null); setInfo(null);
     if (!email.trim()) { setError("Renseignez votre email."); return; }
@@ -96,7 +96,7 @@ export default function AuthScreen({ onAuthenticated }) {
   const verifyOtp = async () => {
     setError(null); setInfo(null);
     const code = otpCode.replace(/\s/g, "");
-    if (!code || code.length < 6) { setError("Saisissez le code à 6 chiffres reçu par email."); return; }
+    if (!code || code.length < 6) { setError("Saisissez le code reçu par email."); return; }
     setLoading(true);
     try {
       await auth.verifyEmailOtp({ email: email.trim(), token: code });
@@ -177,7 +177,7 @@ export default function AuthScreen({ onAuthenticated }) {
           )}
           {mode === "otp" && otpSent && (
             <Field label="Code reçu par email">
-              <input inputMode="numeric" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="6 chiffres" style={{ ...inp, letterSpacing: "6px", fontSize: 20, textAlign: "center" }} autoComplete="one-time-code" maxLength={6} />
+              <input inputMode="numeric" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} placeholder="Code reçu" style={{ ...inp, letterSpacing: "5px", fontSize: 20, textAlign: "center" }} autoComplete="one-time-code" maxLength={8} />
             </Field>
           )}
 
