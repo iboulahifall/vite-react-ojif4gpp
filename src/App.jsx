@@ -413,7 +413,7 @@ function JoinScreen({ onJoin, onFind, defaultName, logout }) {
         </div>
         <div>
           <div style={fieldLabel}>Code d'invitation</div>
-          <input value={code} onChange={(e) => { setCode(e.target.value); setFound(null); }} placeholder="KER-45821"
+          <input value={code} onChange={(e) => { setCode(e.target.value); setFound(null); }} placeholder="WAL-45821"
             style={{ ...fieldInput, letterSpacing: "0.08em", textTransform: "uppercase" }} />
         </div>
 
@@ -450,9 +450,9 @@ function RolePicker({ onPick, db }) {
     <Shell>
       <div style={{ paddingTop: 48, textAlign: "center" }}>
         <div className="ker-pop"><KerMark size={64} /></div>
-        <div className="ker-rise" style={{ fontFamily: "'Inter', sans-serif", fontSize: 42, fontWeight: 800, color: T.ink, letterSpacing: "2px", marginTop: 12, animationDelay: "0.7s" }}>KËR</div>
-        <div className="ker-rise" style={{ fontSize: 13, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px", animationDelay: "0.85s" }}>VOTRE BIEN. VOTRE CONTRÔLE.</div>
-        <div className="ker-rise" style={{ fontSize: 14, color: T.mut, marginTop: 10, animationDelay: "1s" }}>Votre logement au Sénégal,<br/>contrôlé depuis votre téléphone.</div>
+        <div className="ker-rise" style={{ fontFamily: "'Inter', sans-serif", fontSize: 42, fontWeight: 800, color: T.ink, letterSpacing: "2px", marginTop: 12, animationDelay: "0.7s" }}>WALLU</div>
+        <div className="ker-rise" style={{ fontSize: 13, color: T.sun, marginTop: 2, fontWeight: 700, letterSpacing: "3px", animationDelay: "0.85s" }}>TON BIEN, DANS TA MAIN.</div>
+        <div className="ker-rise" style={{ fontSize: 14, color: T.mut, marginTop: 10, animationDelay: "1s" }}>Gère ton bien au Sénégal toi-même,<br/>depuis ton téléphone. Sans agence.</div>
       </div>
       <div style={{ marginTop: 32, display: "grid", gap: 12 }}>
         <div className="ker-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, animationDelay: "1.15s" }}>ESPACE PROPRIETAIRE</div>
@@ -461,13 +461,13 @@ function RolePicker({ onPick, db }) {
         <div className="ker-rise" style={{ animationDelay: "1.39s" }}><BigButton icon={ClipboardList} label={"Continuer comme " + db.manager.full_name} sub="Biens sur place · depenses & problemes" tint={T.sun} onClick={() => onPick({ role: "gestionnaire" })} /></div>
         <div className="ker-rise" style={{ fontSize: 13, color: T.mut, fontWeight: 600, marginTop: 12, animationDelay: "1.49s" }}>ESPACE LOCATAIRE — via code d'invitation</div>
         <div className="ker-rise" style={{ background: T.card, border: "1px solid " + T.line, borderRadius: 18, padding: 16, animationDelay: "1.56s" }}>
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="KER-45821"
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="WAL-45821"
             style={{ width: "100%", border: "1px solid " + T.line, borderRadius: 12, padding: "12px 14px", fontSize: 16, fontFamily: "inherit", letterSpacing: "0.05em" }} />
           <button disabled={!match} onClick={() => onPick({ role: "locataire", unitId: match.id })}
             style={{ ...primaryBtn, width: "100%", justifyContent: "center", marginTop: 10, padding: 13, opacity: match ? 1 : 0.4 }}>
             {match ? "Ouvrir l'espace de " + match.tenant : "Entrez un code valide"}
           </button>
-          <div style={{ fontSize: 12, color: T.mut, marginTop: 8 }}>Codes demo : KER-45821 · KER-91043 · KER-33712 · KER-58260</div>
+          <div style={{ fontSize: 12, color: T.mut, marginTop: 8 }}>Codes demo : WAL-45821 · WAL-91043 · WAL-33712 · WAL-58260</div>
         </div>
       </div>
     </Shell>
@@ -943,7 +943,7 @@ function printMonthlyReport(r, ownerName) {
     + ".label{color:#5E6B66}.val{font-weight:700}"
     + ".foot{margin-top:32px;font-size:12px;color:#999}"
     + "</style></head><body>"
-    + "<h1>RAPPORT MENSUEL — KËR</h1>"
+    + "<h1>RAPPORT MENSUEL — WALLU</h1>"
     + "<div class='sub'>" + (ownerName ? ownerName + " · " : "") + r.label + "</div>"
     + "<h2>Loyers</h2>"
     + row("Loyers attendus", fcfa(r.rentExpected))
@@ -955,7 +955,7 @@ function printMonthlyReport(r, ownerName) {
     + row("Nouveaux", r.probNew)
     + row("En cours", r.probProg)
     + row("Résolus", r.probDone)
-    + "<p class='foot'>Rapport généré automatiquement par KËR à partir des seules données enregistrées. "
+    + "<p class='foot'>Rapport généré automatiquement par WALLU à partir des seules données enregistrées. "
     + "Aucune information n'est inventée.</p>"
     + "</body></html>");
   w.document.close();
@@ -1363,7 +1363,7 @@ function ReceiptModal({ data, owner, onSaved, close }) {
       + "<div class='row'><span class='label'>Montant</span><span class='val'>" + fcfa(unit.rent) + "</span></div>"
       + "<div class='row'><span class='label'>Date de paiement</span><span class='val'>" + (paid_at || "-") + "</span></div>"
       + "<div style='text-align:center'><div class='stamp'>PAYE</div></div>"
-      + "<p style='margin-top:40px;font-size:12px;color:#999'>Genere par KER — Votre logement au Senegal.</p>"
+      + "<p style='margin-top:40px;font-size:12px;color:#999'>Genere par WALLU — Ton bien au pays, dans ta main.</p>"
       + "</body></html>");
     w.document.close(); w.print();
   };
@@ -1405,7 +1405,7 @@ function printReceipt(r) {
     + "<div class='row'><span class='label'>Montant réglé</span><span class='val'>" + money + "</span></div>"
     + "<div class='row'><span class='label'>Date de paiement</span><span class='val'>" + (r.paid_at || "—") + "</span></div>"
     + "<div style='text-align:center'><div class='stamp'>PAYÉ</div></div>"
-    + "<p class='foot'>Quittance générée par KËR — Votre bien. Votre contrôle. "
+    + "<p class='foot'>Quittance générée par WALLU — Ton bien, dans ta main. "
     + "Ce document atteste le règlement du loyer indiqué ci-dessus.</p>"
     + "</body></html>");
   w.document.close();
@@ -1710,7 +1710,7 @@ function ContactScreen({ contact, fallbackName, back }) {
           </div>
         )}
         <div style={{ fontSize: 12.5, color: T.mut, marginTop: 16, textAlign: "center" }}>
-          Vos échanges se font directement, hors de KËR.
+          Vos échanges se font directement, hors de WALLU.
         </div>
       </Screen>
     </Shell>
@@ -1770,7 +1770,7 @@ function Onboarding({ owner, onDone, logout }) {
             </StepWrap>
           )}
           {step === 2 && (
-            <StepWrap icon={Building2} title="Vous possedez un logement au Senegal ?" hint="KER est concu exactement pour ce cas.">
+            <StepWrap icon={Building2} title="Vous possedez un logement au Senegal ?" hint="WALLU est concu exactement pour ce cas.">
               <div style={{ ...card, textAlign: "center", padding: 24 }}>
                 <div style={{ fontSize: 40 }}>🏠</div>
                 <div style={{ fontWeight: 700, marginTop: 8 }}>Parfait.</div>
