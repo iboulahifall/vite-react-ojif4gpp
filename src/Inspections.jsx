@@ -5,7 +5,7 @@
    import React, { useState, useEffect } from "react";
    import { inspections as api } from "./lib/data.js";
    import {
-     ChevronLeft, Plus, Trash2, ClipboardCheck, LogIn, LogOut, Repeat, Calendar, FileText,
+     ChevronLeft, Plus, Trash2, ClipboardCheck, LogIn, LogOut, Repeat, Calendar, FileText, Download,
    } from "lucide-react";
    
    /* Couleurs WALLU (alignées sur le thème de l'app) */
@@ -355,6 +355,13 @@
            </label>
          </div>
    
+         {/* export PDF */}
+         {data.rooms.length > 0 && (
+           <button onClick={() => printInspection(data)} style={{ width: "100%", background: C.card, color: C.ink, border: "1px solid " + C.line, borderRadius: 12, padding: 13, fontWeight: 700, fontSize: 14.5, cursor: "pointer", fontFamily: "inherit", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+             <Download size={16} /> Télécharger le PDF
+           </button>
+         )}
+   
          {/* statut : finaliser */}
          {data.status !== "finalise" && data.status !== "signe" && data.rooms.length > 0 && (
            <button onClick={() => setStatus("finalise")} style={{ width: "100%", background: C.good, color: "#fff", border: "none", borderRadius: 12, padding: 14, fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit", marginBottom: 30 }}>
@@ -379,6 +386,60 @@
      if (it.item_kind === "compteur") return it.meter_value != null;
      if (it.item_kind === "cle") return it.count_value != null;
      return it.condition && it.condition !== "non_verifie";
+   }
+   
+   /* Génère et imprime le PDF d'un état des lieux à partir de ses données réelles. */
+   function printInspection(data) {
+     const w = window.open("", "_blank");
+     if (!w) return;
+     const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+     const typeLabel = TYPE_LABEL[data.type] || "Inspection";
+     const propName = (data.units && data.units.properties && data.units.properties.name) || "";
+     const unitName = (data.units && data.units.label) || "";
+     const lieu = [propName, unitName].filter(Boolean).join(" · ");
+   
+     // rendu d'un élément selon son type
+     const itemLine = (it) => {
+       let right = "";
+       if (it.item_kind === "compteur") right = (it.meter_value != null ? esc(it.meter_value) + " " + esc(it.meter_unit || "") : "—");
+       else if (it.item_kind === "cle") right = (it.count_value != null ? esc(it.count_value) + " clé(s)" : "—");
+       else right = esc(COND_LABEL[it.condition] || "Non vérifié");
+       const comment = it.comment ? "<div class='cmt'>" + esc(it.comment) + "</div>" : "";
+       const photos = (it.photo_urls && it.photo_urls.length) ? "<span class='ph'>" + it.photo_urls.length + " photo(s)</span>" : "";
+       return "<div class='item'><div class='iline'><span class='ilabel'>" + esc(it.label) + "</span><span class='ival'>" + right + " " + photos + "</span></div>" + comment + "</div>";
+     };
+   
+     const roomsHtml = (data.rooms || []).map((room) =>
+       "<h2>" + esc(room.name) + "</h2>" + (room.items.length ? room.items.map(itemLine).join("") : "<div class='empty'>Aucun élément</div>")
+     ).join("");
+   
+     w.document.write("<html><head><title>État des lieux — " + esc(lieu) + "</title><style>"
+       + "body{font-family:Georgia,serif;color:#0B3D34;padding:40px;max-width:680px;margin:auto}"
+       + "h1{font-size:22px;border-bottom:3px solid #0E5C4F;padding-bottom:10px;margin-bottom:4px}"
+       + ".sub{color:#5E6B66;font-size:14px;margin-bottom:6px}"
+       + ".meta{color:#5E6B66;font-size:13px;margin-bottom:22px}"
+       + "h2{font-size:14px;color:#0E5C4F;text-transform:uppercase;letter-spacing:.05em;margin:22px 0 8px;border-bottom:1px solid #E6E0D2;padding-bottom:5px}"
+       + ".item{padding:7px 0;border-bottom:1px solid #f0ede4}"
+       + ".iline{display:flex;justify-content:space-between;gap:12px}"
+       + ".ilabel{color:#0B3D34}.ival{font-weight:700;text-align:right;white-space:nowrap}"
+       + ".cmt{color:#5E6B66;font-size:12.5px;font-style:italic;margin-top:2px}"
+       + ".ph{color:#999;font-weight:400;font-size:11px}"
+       + ".empty{color:#999;font-size:12.5px;font-style:italic;padding:4px 0}"
+       + ".notes{margin-top:22px;padding:12px;background:#F7F4EC;border-radius:8px;font-size:13px}"
+       + ".foot{margin-top:32px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:12px}"
+       + "</style></head><body>"
+       + "<h1>ÉTAT DES LIEUX — WALLU</h1>"
+       + "<div class='sub'>" + esc(data.title || typeLabel) + "</div>"
+       + "<div class='meta'>" + esc(typeLabel) + (lieu ? " · " + esc(lieu) : "") + " · " + fmtDate(data.performed_at || data.created_at)
+       + " · Statut : " + esc(STATUS_LABEL[data.status] || data.status) + "</div>"
+       + roomsHtml
+       + (data.general_notes ? "<div class='notes'><b>Observations générales</b><br>" + esc(data.general_notes) + "</div>" : "")
+       + "<p class='foot'>Document généré par WALLU à partir des seules données enregistrées. "
+       + "Les photos sont conservées dans l'application et consultables en ligne.</p>"
+       + "</body></html>");
+     w.document.close();
+     w.focus();
+     w.print();
    }
    
    function Stat({ n, l, color }) {
