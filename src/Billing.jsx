@@ -200,6 +200,109 @@
      );
    }
    
+   /* Écran : les échéances d'un bail (génération + suivi paiement) */
+   export function EcheancesScreen({ unitId, unitLabel, back }) {
+     const [lease, setLease] = useState(undefined);
+     const [list, setList] = useState([]);
+     const [error, setError] = useState(null);
+     const [busy, setBusy] = useState(false);
+   
+     const refresh = async (autogen) => {
+       try {
+         const l = await api.getLease(unitId);
+         setLease(l);
+         if (!l) { setList([]); return; }
+         if (autogen) { await api.generateEcheances(unitId); }
+         setList(await api.listEcheances(l.id));
+       } catch (e) { setError((e && e.message) || "Chargement impossible."); setLease(null); }
+     };
+     useEffect(() => { refresh(true); }, [unitId]);
+   
+     const generate = async () => {
+       setBusy(true); setError(null);
+       try { const r = await api.generateEcheances(unitId); await refresh(false); }
+       catch (e) { setError((e && e.message) || "Génération impossible."); }
+       setBusy(false);
+     };
+   
+     const togglePaid = async (p) => {
+       try {
+         await api.setEcheanceStatus(p.id, p.status === "paye" ? "en_attente" : "paye");
+         await refresh(false);
+       } catch (e) { setError((e && e.message) || "Mise à jour impossible."); }
+     };
+   
+     const statusOf = (p) => {
+       if (p.status === "paye") return { label: "Payé", color: C.good };
+       // en retard si due_date dépassée
+       if (p.due_date && new Date(p.due_date) < new Date(new Date().toISOString().slice(0, 10))) return { label: "En retard", color: C.bad };
+       return { label: "À payer", color: C.sun };
+     };
+   
+     const totalDu = list.filter((p) => p.status !== "paye").reduce((s, p) => s + (p.amount || 0), 0);
+   
+     if (lease === undefined) return (
+       <div style={{ paddingTop: 16 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+           {back && <button onClick={back} style={iconBtn}><ChevronLeft size={20} /></button>}
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: C.ink }}>Échéances</div>
+         </div>
+         <div style={{ color: C.mut, fontSize: 14, padding: "20px 0" }}>Chargement…</div>
+       </div>
+     );
+   
+     return (
+       <div style={{ paddingTop: 16, paddingBottom: 30 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+           {back && <button onClick={back} style={iconBtn}><ChevronLeft size={20} /></button>}
+           <div style={{ flex: 1 }}>
+             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: C.ink }}>Échéances</div>
+             {unitLabel && <div style={{ fontSize: 13, color: C.mut }}>{unitLabel}</div>}
+           </div>
+         </div>
+   
+         {error && <div style={errorBox}>{error}</div>}
+   
+         {!lease && <div style={{ ...cardBox, textAlign: "center", color: C.mut }}>Configurez d'abord le bail (loyer, périodicité).</div>}
+   
+         {lease && (
+           <>
+             {totalDu > 0 && (
+               <div style={{ background: C.ink, borderRadius: 16, padding: "16px 18px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                 <span style={{ color: "#9FE1CB", fontSize: 13 }}>Total dû</span>
+                 <span style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{fcfa(totalDu)}</span>
+               </div>
+             )}
+   
+             {list.length === 0 && (
+               <div style={{ ...cardBox, textAlign: "center", color: C.mut }}>Aucune échéance. Cliquez ci-dessous pour les générer.</div>
+             )}
+   
+             {list.map((p) => {
+               const s = statusOf(p);
+               return (
+                 <div key={p.id} style={{ ...cardBox, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
+                   <div style={{ flex: 1 }}>
+                     <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>{p.period}</div>
+                     <div style={{ fontSize: 12.5, color: C.mut }}>{fcfa(p.amount)}{p.due_date ? " · échéance " + p.due_date : ""}</div>
+                   </div>
+                   <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, color: "#fff", background: s.color }}>{s.label}</span>
+                   <button onClick={() => togglePaid(p)} style={{ border: "1px solid " + (p.status === "paye" ? C.line : C.teal), background: p.status === "paye" ? C.card : C.teal, color: p.status === "paye" ? C.mut : "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                     {p.status === "paye" ? "Annuler" : "Payé"}
+                   </button>
+                 </div>
+               );
+             })}
+   
+             <button onClick={generate} disabled={busy} style={{ ...primaryBtn, marginTop: 8, opacity: busy ? 0.6 : 1 }}>
+               {busy ? "Génération…" : "Générer les échéances manquantes"}
+             </button>
+           </>
+         )}
+       </div>
+     );
+   }
+   
    /* ---- styles ---- */
    const iconBtn = { width: 38, height: 38, borderRadius: 11, border: "1px solid " + C.line, background: C.card, display: "grid", placeItems: "center", cursor: "pointer", color: C.ink };
    const cardBox = { background: C.card, border: "1px solid " + C.line, borderRadius: 16, padding: 16, marginBottom: 12 };

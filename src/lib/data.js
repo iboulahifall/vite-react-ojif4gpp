@@ -591,7 +591,98 @@ export const billing = {
   recurringTotal(fees) {
     return (fees || []).filter((f) => f.kind === "recurrent" && f.active).reduce((s, f) => s + (f.amount || 0), 0);
   },
+
+  // ----- ÉCHÉANCES -----
+  // Liste les échéances (rent_payments) d'un bail, plus récentes d'abord.
+  async listEcheances(leaseId) {
+    return ok(await supabase.from("rent_payments")
+      .select("*").eq("lease_id", leaseId)
+      .order("due_date", { ascending: false, nullsFirst: false })
+      .order("period", { ascending: false }));
+  },
+
+  // Génère les échéances manquantes du début du bail jusqu'à la prochaine à venir.
+  // Ne recrée jamais une période déjà existante. Renvoie le nombre créé.
+  async generateEcheances(unitId) {
+    const lease = await this.getLease(unitId);
+    if (!lease) return { created: 0 };
+    const rent = lease.rent_amount || 0;
+    const recTotal = this.recurringTotal(lease.fees);
+    const amount = rent + recTotal;
+    const dueDay = lease.due_day || 1;
+    const start = lease.start_date ? new Date(lease.start_date) : new Date();
+    const periodicity = lease.periodicity || "mensuel";
+
+    // périodes déjà présentes
+    const existing = ok(await supabase.from("rent_payments").select("period").eq("lease_id", lease.id));
+    const have = new Set((existing || []).map((r) => r.period));
+
+    // construit la liste des périodes du début jusqu'à maintenant + 1
+    const periods = buildPeriods(start, periodicity, dueDay);
+    const toCreate = periods.filter((p) => !have.has(p.period)).map((p) => ({
+      lease_id: lease.id,
+      period: p.period,
+      due_date: p.dueDate,
+      amount,
+      base_rent: rent,
+      status: "en_attente",
+    }));
+    if (toCreate.length === 0) return { created: 0 };
+    ok(await supabase.from("rent_payments").insert(toCreate));
+    return { created: toCreate.length };
+  },
+
+  // Marque une échéance payée / en attente.
+  async setEcheanceStatus(paymentId, status, method = null) {
+    const clean = { status };
+    if (status === "paye") clean.paid_at = new Date().toISOString().slice(0, 10);
+    if (method) clean.method = method;
+    return ok(await supabase.from("rent_payments").update(clean).eq("id", paymentId).select().single());
+  },
+
+  // Ajuste le montant d'une échéance (override manuel).
+  async setEcheanceAmount(paymentId, amount) {
+    return ok(await supabase.from("rent_payments").update({ amount: Math.round(amount) || 0 }).eq("id", paymentId).select().single());
+  },
+
+  async removeEcheance(paymentId) {
+    return ok(await supabase.from("rent_payments").delete().eq("id", paymentId));
+  },
 };
+
+// Construit les périodes du début jusqu'au mois/période courant + 1 à venir.
+function buildPeriods(start, periodicity, dueDay) {
+  const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const out = [];
+  const now = new Date();
+  const horizon = new Date(now.getFullYear(), now.getMonth() + 1, 1); // +1 période à venir (mensuel)
+  let step; // mois par période
+  if (periodicity === "trimestriel") step = 3;
+  else if (periodicity === "semestriel") step = 6;
+  else if (periodicity === "annuel") step = 12;
+  else step = 1;
+
+  // point de départ : 1er du mois de start
+  let y = start.getFullYear();
+  let m = start.getMonth(); // 0-11
+  let guard = 0;
+  while (guard++ < 240) {
+    const periodDate = new Date(y, m, 1);
+    if (periodDate > horizon) break;
+    const day = Math.min(dueDay, 28);
+    const dueDate = new Date(y, m, day).toISOString().slice(0, 10);
+    let label;
+    if (step === 1) label = cap(MONTHS[m]) + " " + y;
+    else if (step === 3) label = "T" + (Math.floor(m / 3) + 1) + " " + y;
+    else if (step === 6) label = "S" + (Math.floor(m / 6) + 1) + " " + y;
+    else label = "" + y;
+    out.push({ period: label, dueDate });
+    m += step;
+    while (m > 11) { m -= 12; y += 1; }
+  }
+  return out;
+}
 
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
 export const storage = {
