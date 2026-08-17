@@ -3,12 +3,13 @@ import { useWalluData, REAL } from "./lib/useWalluData.js";
 import AuthScreen from "./lib/AuthScreen.jsx";
 import { InspectionsList, InspectionDetail } from "./Inspections.jsx";
 import { DocumentScanner } from "./Scanner.jsx";
+import { WavePayScreen } from "./WavePay.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
   Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2, Bell,
   CircleDot, ArrowRight, X, FileText, Download, Users,
   Droplet, Zap, ShowerHead, DoorClosed, Snowflake, MoreHorizontal,
-  Camera, MessageCircle, Copy, Check, UserPlus, LogOut,
+  Camera, MessageCircle, Copy, Check, UserPlus, LogOut, Smartphone,
   ClipboardList, ClipboardCheck, ScanLine, BarChart3, ShieldCheck, AlertTriangle, Settings,
   FolderOpen, File, Image as ImageIcon, Search, Upload, Check as CheckIcon, MapPin, KeyRound
 } from "lucide-react";
@@ -499,7 +500,8 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "inspections" && <InspectionsList unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} openDetail={(inspId) => setView({ name: "inspection", inspId, unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
       {view.name === "inspection" && <InspectionDetail inspectionId={view.inspId} back={() => setView({ name: "inspections", unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
       {view.name === "scanner" && <DocumentScanner back={() => setView({ name: "dashboard" })} />}
-      {view.name === "rents" && <Rents props={props} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} />}
+      {view.name === "wavepay" && <WavePayScreen phone={view.phone} amount={view.amount} label={view.label} back={() => setView({ name: "rents" })} />}
+      {view.name === "rents" && <Rents props={props} owner={db.owner} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} onWave={(u) => setView({ name: "wavepay", phone: db.owner.wave_number || db.owner.phone, amount: u.rent, label: u.label + " · " + u.tenant })} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} onDelete={onDeleteExpense} onOpenReceipt={onOpenDocument} />}
       {view.name === "settings" && <SettingsScreen threshold={db.settings.approval_threshold} onThreshold={onThreshold} back={() => setView({ name: "expenses" })} />}
@@ -685,8 +687,9 @@ function PropertyDetail({ property, back, onInvite, onAddUnit, onInspect }) {
   );
 }
 
-function Rents({ props, back, onRecord, onReceipt }) {
+function Rents({ props, owner, back, onRecord, onReceipt, onWave }) {
   const units = props.flatMap((p) => p.units.map((u) => ({ ...u, propName: p.name })));
+  const hasWave = owner && (owner.wave_number || owner.phone);
   return (
     <Screen title="Loyers" back={back}>
       <div style={{ display: "grid", gap: 12 }}>
@@ -712,6 +715,11 @@ function Rents({ props, back, onRecord, onReceipt }) {
                   ? <button onClick={() => onRecord(u.id, u.rent)} style={{ ...primaryBtn, flex: 1 }}>Enregistrer le paiement</button>
                   : <button onClick={() => onReceipt({ unit: u, period: last.period, paid_at: last.paid_at })} style={{ ...ghostBtn, flex: 1 }}><FileText size={15} /> Quittance</button>}
               </div>
+              {last.status !== "paye" && hasWave && onWave && (
+                <button onClick={() => onWave(u)} style={{ width: "100%", marginTop: 8, background: "#1DC8F2", color: "#0B3D34", border: "none", borderRadius: 12, padding: 12, fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                  <Smartphone size={16} /> Payer avec Wave
+                </button>
+              )}
             </div>
           );
         })}
