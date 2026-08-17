@@ -579,49 +579,77 @@ function FormField({ label, children }) {
 
 function OwnerDashboard({ db, props, stats, go, logout }) {
   const totalUnits = props.reduce((a, p) => a + p.units.length, 0);
+  const unread = (db.notifications || []).filter((n) => !n.read).length;
+  const pct = stats.expected > 0 ? Math.min(100, Math.round((stats.paid / stats.expected) * 100)) : 0;
+  const initials = (db.owner.full_name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
   return (
     <div className="fade" style={{ paddingTop: 18 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 14, color: T.mut }}>Bonjour</div>
-          <div style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700 }}>{db.owner.full_name}</div>
+      {/* header : avatar + nom + actions */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: T.sun, color: "#4A2B00", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 15 }}>{initials}</div>
+          <div>
+            <div style={{ fontSize: 13, color: T.mut }}>Bonjour</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, lineHeight: 1.1 }}>{db.owner.full_name}</div>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => go({ name: "notifications" })} style={{ ...navIcon, position: "relative" }} title="Notifications">
             <Bell size={18} color={T.ink} />
-            {(db.notifications || []).filter((n) => !n.read).length > 0 && (
-              <span style={{ position: "absolute", top: 4, right: 4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: T.late, color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center" }}>
-                {(db.notifications || []).filter((n) => !n.read).length}
-              </span>
+            {unread > 0 && (
+              <span style={{ position: "absolute", top: 4, right: 4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 999, background: T.late, color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center" }}>{unread}</span>
             )}
           </button>
           <button onClick={() => go({ name: "profile" })} style={navIcon} title="Mon profil"><Settings size={18} color={T.ink} /></button>
           <button onClick={logout} style={navIcon} title="Changer d'espace"><LogOut size={18} color={T.ink} /></button>
         </div>
       </div>
-      <div style={{ fontSize: 13, color: T.mut, margin: "14px 0 8px", fontWeight: 600 }}>MON PATRIMOINE — CE MOIS</div>
-      <div style={{ display: "flex", gap: 10 }}>
-        <StatCard label="Attendus" value={fcfa(stats.expected)} big />
-        <StatCard label="Encaisses" value={fcfa(stats.paid)} color={T.paid} big />
+
+      {/* bloc financier principal (style fintech) */}
+      <div style={{ background: T.ink, borderRadius: 20, padding: "20px 22px", color: "#fff" }}>
+        <div style={{ fontSize: 11.5, letterSpacing: 1, color: "#9FE1CB", fontWeight: 600 }}>ATTENDUS CE MOIS</div>
+        <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: "-0.02em", marginTop: 2 }}>{fcfa(stats.expected)}</div>
+
+        {/* barre de progression du recouvrement */}
+        <div style={{ height: 8, background: "rgba(255,255,255,.14)", borderRadius: 20, overflow: "hidden", margin: "14px 0 6px" }}>
+          <div style={{ height: "100%", width: pct + "%", background: T.paid, transition: "width .3s" }} />
+        </div>
+        <div style={{ fontSize: 12, color: "#9FE1CB" }}>{fcfa(stats.paid)} encaissés · {pct}%</div>
+
+        {/* mini-stats */}
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <div style={{ flex: 1, background: "rgba(255,255,255,.08)", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#9FE1CB" }}>En retard</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: stats.late > 0 ? "#FF9B8A" : "#fff" }}>{fcfa(stats.late)}</div>
+          </div>
+          <div style={{ flex: 1, background: "rgba(255,255,255,.08)", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#9FE1CB" }}>Dépenses</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{fcfa(stats.spend)}</div>
+          </div>
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-        <StatCard label="En retard" value={fcfa(stats.late)} color={T.late} />
-        <StatCard label="Depenses" value={fcfa(stats.spend)} color={T.sun} />
-      </div>
+
+      {/* alerte à traiter */}
       {(stats.problems > 0 || stats.toValidate > 0) && (
-        <div style={{ marginTop: 14, background: T.sunSoft, borderRadius: 16, padding: "14px 16px", fontSize: 14, color: "#8A5416" }}>
-          <strong>A traiter :</strong>{" "}
-          {stats.problems > 0 && stats.problems + " probleme" + (stats.problems > 1 ? "s" : "") + " ouvert" + (stats.problems > 1 ? "s" : "")}
-          {stats.problems > 0 && stats.toValidate > 0 && " · "}
-          {stats.toValidate > 0 && stats.toValidate + " depense" + (stats.toValidate > 1 ? "s" : "") + " a valider"}
+        <div style={{ marginTop: 12, background: T.sunSoft, borderRadius: 14, padding: "12px 16px", fontSize: 13.5, color: "#8A5416", display: "flex", alignItems: "center", gap: 9 }}>
+          <AlertTriangle size={17} color="#B5730E" />
+          <span>
+            <strong>À traiter :</strong>{" "}
+            {stats.problems > 0 && stats.problems + " problème" + (stats.problems > 1 ? "s" : "") + " ouvert" + (stats.problems > 1 ? "s" : "")}
+            {stats.problems > 0 && stats.toValidate > 0 && " · "}
+            {stats.toValidate > 0 && stats.toValidate + " dépense" + (stats.toValidate > 1 ? "s" : "") + " à valider"}
+          </span>
         </div>
       )}
-      <div style={{ fontSize: 13, color: T.mut, margin: "20px 0 10px", fontWeight: 600 }}>{totalUnits} logements · acces rapide</div>
+
+      {/* accès rapide */}
+      <div style={{ fontSize: 13, color: T.mut, margin: "20px 0 10px", fontWeight: 600 }}>{totalUnits} logements · accès rapide</div>
       <div style={{ display: "grid", gap: 10 }}>
-        <BigButton icon={Building2} label="Mes logements" sub={props.length + " bien" + (props.length>1?"s":"")} tint={T.teal} onClick={() => go({ name: "properties" })} />
-        <BigButton icon={Wrench} label="Problemes" sub={stats.problems + " ouvert" + (stats.problems>1?"s":"")} tint={T.late} onClick={() => go({ name: "problems" })} />
-        <BigButton icon={Receipt} label="Depenses" sub={stats.toValidate > 0 ? stats.toValidate + " a valider" : "A jour"} tint={T.sun} onClick={() => go({ name: "expenses" })} />
-        <BigButton icon={BarChart3} label="Rapport mensuel" sub="Resume automatique" tint={T.prog} onClick={() => go({ name: "report" })} />
+        <BigButton icon={Building2} label="Mes logements" sub={props.length + " bien" + (props.length > 1 ? "s" : "")} tint={T.teal} onClick={() => go({ name: "properties" })} />
+        <BigButton icon={Wrench} label="Problèmes" sub={stats.problems + " ouvert" + (stats.problems > 1 ? "s" : "")} tint={T.late} onClick={() => go({ name: "problems" })} />
+        <BigButton icon={Receipt} label="Dépenses" sub={stats.toValidate > 0 ? stats.toValidate + " à valider" : "À jour"} tint={T.sun} onClick={() => go({ name: "expenses" })} />
+        <BigButton icon={BarChart3} label="Rapport mensuel" sub="Résumé automatique" tint={T.prog} onClick={() => go({ name: "report" })} />
         <BigButton icon={ScanLine} label="Scanner un document" sub="Extraire le texte (OCR)" tint={T.teal} onClick={() => go({ name: "scanner" })} />
       </div>
     </div>
