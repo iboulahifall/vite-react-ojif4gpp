@@ -534,22 +534,30 @@ export const inspections = {
 /* ---------------- FACTURATION LOCATIVE (baux, frais, caution) ---------------- */
 export const billing = {
   // Récupère le bail actif d'une unité, avec ses frais.
+  // Robuste : si plusieurs baux actifs existent (données historiques),
+  // prend le plus récent au lieu de planter.
   async getLease(unitId) {
-    const lease = await supabase.from("leases")
+    const res = await supabase.from("leases")
       .select("*")
       .eq("unit_id", unitId).eq("active", true)
-      .maybeSingle();
-    if (!lease.data) return null;
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const lease = res.data && res.data[0];
+    if (!lease) return null;
     const fees = ok(await supabase.from("lease_fees")
-      .select("*").eq("lease_id", lease.data.id)
+      .select("*").eq("lease_id", lease.id)
       .order("created_at", { ascending: true }));
-    return { ...lease.data, fees };
+    return { ...lease, fees };
   },
 
-  // Crée le bail actif s'il n'existe pas, et renvoie son id.
+  // Renvoie l'id du bail actif s'il existe (le plus récent), sinon en crée un.
   async ensureLease(unitId, rentAmount = 0) {
-    const existing = await supabase.from("leases").select("id").eq("unit_id", unitId).eq("active", true).maybeSingle();
-    if (existing.data && existing.data.id) return existing.data.id;
+    const res = await supabase.from("leases")
+      .select("id")
+      .eq("unit_id", unitId).eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (res.data && res.data[0]) return res.data[0].id;
     const created = ok(await supabase.from("leases").insert({
       unit_id: unitId, rent_amount: rentAmount || 0, active: true,
     }).select().single());
