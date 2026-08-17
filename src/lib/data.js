@@ -531,6 +531,68 @@ export const inspections = {
   },
 };
 
+/* ---------------- FACTURATION LOCATIVE (baux, frais, caution) ---------------- */
+export const billing = {
+  // Récupère le bail actif d'une unité, avec ses frais.
+  async getLease(unitId) {
+    const lease = await supabase.from("leases")
+      .select("*")
+      .eq("unit_id", unitId).eq("active", true)
+      .maybeSingle();
+    if (!lease.data) return null;
+    const fees = ok(await supabase.from("lease_fees")
+      .select("*").eq("lease_id", lease.data.id)
+      .order("created_at", { ascending: true }));
+    return { ...lease.data, fees };
+  },
+
+  // Crée le bail actif s'il n'existe pas, et renvoie son id.
+  async ensureLease(unitId, rentAmount = 0) {
+    const existing = await supabase.from("leases").select("id").eq("unit_id", unitId).eq("active", true).maybeSingle();
+    if (existing.data && existing.data.id) return existing.data.id;
+    const created = ok(await supabase.from("leases").insert({
+      unit_id: unitId, rent_amount: rentAmount || 0, active: true,
+    }).select().single());
+    return created.id;
+  },
+
+  // Configure un bail : loyer, périodicité, jour d'échéance, dates, caution.
+  async configureLease(leaseId, cfg) {
+    const clean = {};
+    if (cfg.rentAmount !== undefined) clean.rent_amount = Math.round(cfg.rentAmount) || 0;
+    if (cfg.periodicity !== undefined) clean.periodicity = cfg.periodicity;
+    if (cfg.dueDay !== undefined) clean.due_day = cfg.dueDay;
+    if (cfg.startDate !== undefined) clean.start_date = cfg.startDate;
+    if (cfg.endDate !== undefined) clean.end_date = cfg.endDate;
+    if (cfg.depositAmount !== undefined) clean.deposit_amount = Math.round(cfg.depositAmount) || 0;
+    if (cfg.depositStatus !== undefined) clean.deposit_status = cfg.depositStatus;
+    if (cfg.depositPaidAt !== undefined) clean.deposit_paid_at = cfg.depositPaidAt;
+    return ok(await supabase.from("leases").update(clean).eq("id", leaseId).select().single());
+  },
+
+  // ----- FRAIS -----
+  async addFee(leaseId, { kind = "recurrent", label, amount }) {
+    return ok(await supabase.from("lease_fees").insert({
+      lease_id: leaseId, kind, label, amount: Math.round(amount) || 0, active: true,
+    }).select().single());
+  },
+  async updateFee(feeId, patch) {
+    const clean = {};
+    if (patch.label !== undefined) clean.label = patch.label;
+    if (patch.amount !== undefined) clean.amount = Math.round(patch.amount) || 0;
+    if (patch.active !== undefined) clean.active = patch.active;
+    return ok(await supabase.from("lease_fees").update(clean).eq("id", feeId).select().single());
+  },
+  async removeFee(feeId) {
+    return ok(await supabase.from("lease_fees").delete().eq("id", feeId));
+  },
+
+  // Total des frais récurrents actifs (à ajouter au loyer de chaque échéance).
+  recurringTotal(fees) {
+    return (fees || []).filter((f) => f.kind === "recurrent" && f.active).reduce((s, f) => s + (f.amount || 0), 0);
+  },
+};
+
 /* ---------------- STOCKAGE (photos, justificatifs) ---------------- */
 export const storage = {
   // Bucket privé "documents". Chemin = {user_id}/{timestamp}-{nom}
