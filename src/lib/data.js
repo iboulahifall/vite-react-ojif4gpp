@@ -656,6 +656,43 @@ export const billing = {
   async removeEcheance(paymentId) {
     return ok(await supabase.from("rent_payments").delete().eq("id", paymentId));
   },
+
+  // ----- FRAIS PONCTUELS (rattachés à une échéance) -----
+  // Liste les frais ponctuels d'une échéance.
+  async feesForEcheance(paymentId) {
+    return ok(await supabase.from("lease_fees")
+      .select("*").eq("payment_id", paymentId)
+      .order("created_at", { ascending: true }));
+  },
+  // Ajoute un frais ponctuel à une échéance et met à jour son montant total.
+  async addPonctuelFee(leaseId, paymentId, { label, amount }) {
+    const fee = ok(await supabase.from("lease_fees").insert({
+      lease_id: leaseId, kind: "ponctuel", label, amount: Math.round(amount) || 0,
+      active: true, payment_id: paymentId,
+    }).select().single());
+    await this._recomputeEcheance(paymentId);
+    return fee;
+  },
+  async removePonctuelFee(feeId, paymentId) {
+    ok(await supabase.from("lease_fees").delete().eq("id", feeId));
+    await this._recomputeEcheance(paymentId);
+  },
+  // Recalcule le montant d'une échéance = base_rent + frais ponctuels rattachés.
+  async _recomputeEcheance(paymentId) {
+    const p = ok(await supabase.from("rent_payments").select("base_rent, amount").eq("id", paymentId).single());
+    const fees = ok(await supabase.from("lease_fees").select("amount").eq("payment_id", paymentId));
+    // Si base_rent absent (ancienne échéance), on l'initialise avec le montant
+    // actuel MOINS les frais ponctuels déjà rattachés, pour ne pas les compter deux fois.
+    let base = p.base_rent;
+    if (base == null) {
+      const extraExisting = (fees || []).reduce((s, f) => s + (f.amount || 0), 0);
+      base = (p.amount || 0) - extraExisting;
+      if (base < 0) base = 0;
+      await supabase.from("rent_payments").update({ base_rent: base }).eq("id", paymentId);
+    }
+    const extra = (fees || []).reduce((s, f) => s + (f.amount || 0), 0);
+    return ok(await supabase.from("rent_payments").update({ amount: base + extra }).eq("id", paymentId).select().single());
+  },
 };
 
 // Construit les périodes du début jusqu'au mois/période courant + 1 à venir.

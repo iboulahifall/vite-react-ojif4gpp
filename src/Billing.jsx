@@ -206,6 +206,7 @@
      const [list, setList] = useState([]);
      const [error, setError] = useState(null);
      const [busy, setBusy] = useState(false);
+     const [detailEch, setDetailEch] = useState(null);
    
      const refresh = async (autogen) => {
        try {
@@ -282,10 +283,10 @@
                const s = statusOf(p);
                return (
                  <div key={p.id} style={{ ...cardBox, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
-                   <div style={{ flex: 1 }}>
+                   <button onClick={() => setDetailEch(p)} style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
                      <div style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>{p.period}</div>
                      <div style={{ fontSize: 12.5, color: C.mut }}>{fcfa(p.amount)}{p.due_date ? " · échéance " + p.due_date : ""}</div>
-                   </div>
+                   </button>
                    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, color: "#fff", background: s.color }}>{s.label}</span>
                    <button onClick={() => togglePaid(p)} style={{ border: "1px solid " + (p.status === "paye" ? C.line : C.teal), background: p.status === "paye" ? C.card : C.teal, color: p.status === "paye" ? C.mut : "#fff", borderRadius: 9, padding: "7px 11px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
                      {p.status === "paye" ? "Annuler" : "Payé"}
@@ -299,6 +300,94 @@
              </button>
            </>
          )}
+   
+         {detailEch && <EcheanceDetailSheet echeance={detailEch} leaseId={lease.id} onChange={() => refresh(false)} close={() => setDetailEch(null)} />}
+       </div>
+     );
+   }
+   
+   /* Feuille : détail d'une échéance + frais ponctuels */
+   function EcheanceDetailSheet({ echeance, leaseId, onChange, close }) {
+     const [fees, setFees] = useState(null);
+     const [adding, setAdding] = useState(false);
+     const [error, setError] = useState(null);
+   
+     const load = async () => {
+       try { setFees(await api.feesForEcheance(echeance.id)); }
+       catch (e) { setError((e && e.message) || "Chargement impossible."); setFees([]); }
+     };
+     useEffect(() => { load(); }, [echeance.id]);
+   
+     const onAdd = async ({ label, amount }) => {
+       try {
+         await api.addPonctuelFee(leaseId, echeance.id, { label, amount });
+         setAdding(false);
+         await load(); onChange && onChange();
+       } catch (e) { setError((e && e.message) || "Ajout impossible."); }
+     };
+     const onRemove = async (feeId) => {
+       try { await api.removePonctuelFee(feeId, echeance.id); await load(); onChange && onChange(); }
+       catch (e) { setError((e && e.message) || "Suppression impossible."); }
+     };
+   
+     const base = echeance.base_rent != null ? echeance.base_rent : echeance.amount;
+     const extra = (fees || []).reduce((s, f) => s + (f.amount || 0), 0);
+   
+     return (
+       <div onClick={close} style={overlay}>
+         <div onClick={(e) => e.stopPropagation()} style={sheet}>
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 4 }}>{echeance.period}</div>
+           <div style={{ fontSize: 13, color: C.mut, marginBottom: 16 }}>{echeance.due_date ? "Échéance le " + echeance.due_date : ""}</div>
+   
+           {error && <div style={errorBox}>{error}</div>}
+   
+           {/* composition */}
+           <div style={{ background: C.card, border: "1px solid " + C.line, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
+               <span style={{ color: C.mut }}>Loyer + charges</span><span style={{ color: C.ink, fontWeight: 700 }}>{fcfa(base)}</span>
+             </div>
+             {fees === null && <div style={{ fontSize: 13, color: C.mut }}>Chargement…</div>}
+             {(fees || []).map((f) => (
+               <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: "1px solid " + C.line }}>
+                 <span style={{ flex: 1, fontSize: 14, color: C.ink }}>{f.label}</span>
+                 <span style={{ fontSize: 14, color: C.ink }}>{fcfa(f.amount)}</span>
+                 <button onClick={() => onRemove(f.id)} style={{ border: "none", background: "transparent", color: C.bad, cursor: "pointer", padding: 2 }}><Trash2 size={14} /></button>
+               </div>
+             ))}
+             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, color: C.ink, borderTop: "2px solid " + C.line, paddingTop: 8, marginTop: 6 }}>
+               <span>Total</span><span>{fcfa(base + extra)}</span>
+             </div>
+           </div>
+   
+           <button onClick={() => setAdding(true)} style={{ ...primaryBtn }}>
+             <Plus size={16} style={{ verticalAlign: "-3px" }} /> Ajouter un frais ponctuel
+           </button>
+   
+           {adding && <AddPonctuelSheet onAdd={onAdd} close={() => setAdding(false)} />}
+         </div>
+       </div>
+     );
+   }
+   
+   function AddPonctuelSheet({ onAdd, close }) {
+     const [label, setLabel] = useState("");
+     const [amount, setAmount] = useState("");
+     const [busy, setBusy] = useState(false);
+     const SUGGEST = ["Pénalité de retard", "Réparation", "Frais de dossier", "Régularisation charges"];
+     const submit = async () => { if (!label.trim() || !amount) return; setBusy(true); await onAdd({ label: label.trim(), amount: Number(amount) }); setBusy(false); };
+     return (
+       <div onClick={close} style={{ ...overlay, zIndex: 60 }}>
+         <div onClick={(e) => e.stopPropagation()} style={sheet}>
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Frais ponctuel</div>
+           <div style={fieldLabel}>Libellé</div>
+           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex : Pénalité de retard" style={input} />
+           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+             {SUGGEST.map((s) => <button key={s} onClick={() => setLabel(s)} style={{ border: "1px solid " + C.line, background: C.card, borderRadius: 20, padding: "5px 11px", fontSize: 12.5, color: C.ink, cursor: "pointer", fontFamily: "inherit" }}>{s}</button>)}
+           </div>
+           <div style={{ ...fieldLabel, marginTop: 16 }}>Montant (FCFA)</div>
+           <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="Ex : 5000" style={input} />
+           <button onClick={submit} disabled={busy} style={{ ...primaryBtn, marginTop: 18, opacity: busy ? 0.6 : 1 }}>{busy ? "Ajout…" : "Ajouter"}</button>
+         </div>
        </div>
      );
    }
