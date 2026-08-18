@@ -600,6 +600,48 @@ export const billing = {
     return (fees || []).filter((f) => f.kind === "recurrent" && f.active).reduce((s, f) => s + (f.amount || 0), 0);
   },
 
+  // ----- CAUTION : retenues et restitution -----
+  // Liste les retenues sur caution d'un bail.
+  async listDeductions(leaseId) {
+    return ok(await supabase.from("deposit_deductions")
+      .select("*").eq("lease_id", leaseId)
+      .order("created_at", { ascending: true }));
+  },
+  // Ajoute une retenue (motif + montant), éventuellement liée à une inspection de sortie.
+  async addDeduction(leaseId, { label, amount, inspectionId = null }) {
+    return ok(await supabase.from("deposit_deductions").insert({
+      lease_id: leaseId, label, amount: Math.round(amount) || 0, inspection_id: inspectionId,
+    }).select().single());
+  },
+  async removeDeduction(deductionId) {
+    return ok(await supabase.from("deposit_deductions").delete().eq("id", deductionId));
+  },
+  // Marque la caution comme versée (détenue).
+  async markDepositHeld(leaseId) {
+    return ok(await supabase.from("leases").update({
+      deposit_status: "detenue", deposit_paid_at: new Date().toISOString().slice(0, 10),
+    }).eq("id", leaseId).select().single());
+  },
+  // Restitue la caution : calcule le montant rendu (caution - retenues) et met à jour le statut.
+  async restituteDeposit(leaseId) {
+    const lease = ok(await supabase.from("leases").select("deposit_amount").eq("id", leaseId).single());
+    const deds = ok(await supabase.from("deposit_deductions").select("amount").eq("lease_id", leaseId));
+    const totalDed = (deds || []).reduce((s, d) => s + (d.amount || 0), 0);
+    const returned = Math.max(0, (lease.deposit_amount || 0) - totalDed);
+    const status = totalDed > 0 ? "partiellement_restituee" : "restituee";
+    return ok(await supabase.from("leases").update({
+      deposit_status: status, deposit_returned: returned,
+      deposit_returned_at: new Date().toISOString().slice(0, 10),
+    }).eq("id", leaseId).select().single());
+  },
+  // Inspections de sortie d'une unité (pour lier une retenue à un état des lieux).
+  async exitInspections(unitId) {
+    return ok(await supabase.from("inspections")
+      .select("id, title, type, performed_at, created_at")
+      .eq("unit_id", unitId).eq("type", "sortie")
+      .order("created_at", { ascending: false }));
+  },
+
   // ----- ÉCHÉANCES -----
   // Liste les échéances (rent_payments) d'un bail, plus récentes d'abord.
   async listEcheances(leaseId) {

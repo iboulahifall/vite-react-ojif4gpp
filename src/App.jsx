@@ -4,7 +4,7 @@ import AuthScreen from "./lib/AuthScreen.jsx";
 import { InspectionsList, InspectionDetail } from "./Inspections.jsx";
 import { DocumentScanner } from "./Scanner.jsx";
 import { WavePayScreen } from "./WavePay.jsx";
-import { LeaseConfig, EcheancesScreen } from "./Billing.jsx";
+import { LeaseConfig, EcheancesScreen, DepositScreen } from "./Billing.jsx";
 import { auth as supaAuth } from "./lib/data.js";
 import {
   Home, Wallet, Wrench, Receipt, Plus, ChevronLeft, ChevronRight, Building2, Bell,
@@ -497,13 +497,14 @@ function OwnerApp({ db, onRecord, onProblemStatus, onRepair, onOpenPhoto, onExpe
       {view.name === "dashboard" && <OwnerDashboard db={db} props={props} stats={stats} go={setView} logout={logout} />}
       {view.name === "notifications" && <NotificationsScreen notifs={db.notifications || []} onMarkRead={onMarkNotifsRead} back={() => setView({ name: "dashboard" })} />}
       {view.name === "properties" && <Properties props={props} go={setView} back={() => setView({ name: "dashboard" })} onAdd={() => setAddProp(true)} />}
-      {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} onInspect={(unit, propId) => setView({ name: "inspections", unitId: unit.id, unitLabel: unit.label, propId })} onConfigLease={(unit, propId) => setView({ name: "leaseconfig", unitId: unit.id, unitLabel: unit.label, propId })} onEcheances={(unit, propId) => setView({ name: "echeances", unitId: unit.id, unitLabel: unit.label, propId })} />}
+      {view.name === "property" && <PropertyDetail property={props.find((p) => p.id === view.id)} back={() => setView({ name: "properties" })} onInvite={setInvite} onAddUnit={() => setAddUnitFor(view.id)} onInspect={(unit, propId) => setView({ name: "inspections", unitId: unit.id, unitLabel: unit.label, propId })} onConfigLease={(unit, propId) => setView({ name: "leaseconfig", unitId: unit.id, unitLabel: unit.label, propId })} onEcheances={(unit, propId) => setView({ name: "echeances", unitId: unit.id, unitLabel: unit.label, propId })} onDeposit={(unit, propId) => setView({ name: "deposit", unitId: unit.id, unitLabel: unit.label, propId })} />}
       {view.name === "inspections" && <InspectionsList unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} openDetail={(inspId) => setView({ name: "inspection", inspId, unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
       {view.name === "inspection" && <InspectionDetail inspectionId={view.inspId} back={() => setView({ name: "inspections", unitId: view.unitId, unitLabel: view.unitLabel, propId: view.propId })} />}
       {view.name === "scanner" && <DocumentScanner back={() => setView({ name: "dashboard" })} />}
       {view.name === "wavepay" && <WavePayScreen phone={view.phone} amount={view.amount} label={view.label} back={() => setView({ name: "rents" })} />}
       {view.name === "leaseconfig" && <LeaseConfig unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} />}
       {view.name === "echeances" && <EcheancesScreen unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} />}
+      {view.name === "deposit" && <DepositScreen unitId={view.unitId} unitLabel={view.unitLabel} back={() => setView({ name: "property", id: view.propId })} />}
       {view.name === "rents" && <Rents props={props} owner={db.owner} back={() => setView({ name: "dashboard" })} onRecord={onRecord} onReceipt={setReceipt} onWave={(u) => setView({ name: "wavepay", phone: db.owner.wave_number || db.owner.phone, amount: u.rent, label: u.label + " · " + u.tenant })} />}
       {view.name === "problems" && <Problems props={props} back={() => setView({ name: "dashboard" })} onStatus={onProblemStatus} onRepair={onRepair} onOpenPhoto={onOpenPhoto} />}
       {view.name === "expenses" && <OwnerExpenses props={props} threshold={db.settings.approval_threshold} back={() => setView({ name: "dashboard" })} onStatus={onExpenseStatus} go={setView} onAddClick={() => setAddExp(true)} onDelete={onDeleteExpense} onOpenReceipt={onOpenDocument} />}
@@ -675,7 +676,7 @@ function Properties({ props, go, back, onAdd }) {
   );
 }
 
-function PropertyDetail({ property, back, onInvite, onAddUnit, onInspect, onConfigLease, onEcheances }) {
+function PropertyDetail({ property, back, onInvite, onAddUnit, onInspect, onConfigLease, onEcheances, onDeposit }) {
   if (!property) return null;
   return (
     <Screen title={property.name} back={back} sub={property.city + " · " + property.district}>
@@ -703,6 +704,9 @@ function PropertyDetail({ property, back, onInvite, onAddUnit, onInspect, onConf
               </button>
               <button onClick={() => onEcheances && onEcheances(u, property.id)} style={{ ...ghostBtn, width: "100%", justifyContent: "center", marginTop: 8 }}>
                 <Wallet size={15} /> Échéances & paiements
+              </button>
+              <button onClick={() => onDeposit && onDeposit(u, property.id)} style={{ ...ghostBtn, width: "100%", justifyContent: "center", marginTop: 8 }}>
+                <ShieldCheck size={15} /> Caution
               </button>
             </div>
           );

@@ -392,6 +392,182 @@
      );
    }
    
+   /* Écran : suivi de la caution (dépôt de garantie) */
+   export function DepositScreen({ unitId, unitLabel, back }) {
+     const [lease, setLease] = useState(undefined);
+     const [deductions, setDeductions] = useState([]);
+     const [exits, setExits] = useState([]);
+     const [error, setError] = useState(null);
+     const [adding, setAdding] = useState(false);
+   
+     const load = async () => {
+       try {
+         const l = await api.getLease(unitId);
+         setLease(l);
+         if (l) {
+           setDeductions(await api.listDeductions(l.id));
+           setExits(await api.exitInspections(unitId));
+         }
+       } catch (e) { setError((e && e.message) || "Chargement impossible."); setLease(null); }
+     };
+     useEffect(() => { load(); }, [unitId]);
+   
+     const totalDed = deductions.reduce((s, d) => s + (d.amount || 0), 0);
+     const deposit = lease ? (lease.deposit_amount || 0) : 0;
+     const net = Math.max(0, deposit - totalDed);
+   
+     const STATUS = {
+       non_verse: { label: "Non versée", color: C.mut },
+       detenue: { label: "Détenue", color: C.teal },
+       restituee: { label: "Restituée", color: C.good },
+       partiellement_restituee: { label: "Partiellement restituée", color: C.sun },
+     };
+   
+     const markHeld = async () => {
+       try { await api.markDepositHeld(lease.id); await load(); }
+       catch (e) { setError((e && e.message) || "Action impossible."); }
+     };
+     const restitute = async () => {
+       try { await api.restituteDeposit(lease.id); await load(); }
+       catch (e) { setError((e && e.message) || "Restitution impossible."); }
+     };
+     const onAddDed = async (d) => {
+       try { await api.addDeduction(lease.id, d); setAdding(false); await load(); }
+       catch (e) { setError((e && e.message) || "Ajout impossible."); }
+     };
+     const onRemoveDed = async (id) => {
+       try { await api.removeDeduction(id); await load(); }
+       catch (e) { setError((e && e.message) || "Suppression impossible."); }
+     };
+   
+     if (lease === undefined) return (
+       <div style={{ paddingTop: 16 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+           {back && <button onClick={back} style={iconBtn}><ChevronLeft size={20} /></button>}
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: C.ink }}>Caution</div>
+         </div>
+         <div style={{ color: C.mut, fontSize: 14, padding: "20px 0" }}>Chargement…</div>
+       </div>
+     );
+   
+     const st = lease ? (STATUS[lease.deposit_status] || STATUS.non_verse) : STATUS.non_verse;
+     const isReturned = lease && (lease.deposit_status === "restituee" || lease.deposit_status === "partiellement_restituee");
+   
+     return (
+       <div style={{ paddingTop: 16, paddingBottom: 30 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+           {back && <button onClick={back} style={iconBtn}><ChevronLeft size={20} /></button>}
+           <div style={{ flex: 1 }}>
+             <div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 700, color: C.ink }}>Caution</div>
+             {unitLabel && <div style={{ fontSize: 13, color: C.mut }}>{unitLabel}</div>}
+           </div>
+         </div>
+   
+         {error && <div style={errorBox}>{error}</div>}
+   
+         {!lease && <div style={{ ...cardBox, textAlign: "center", color: C.mut }}>Configurez d'abord le bail.</div>}
+   
+         {lease && (
+           <>
+             {/* montant + statut */}
+             <div style={{ background: C.ink, borderRadius: 16, padding: "18px 20px", marginBottom: 14 }}>
+               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                 <span style={{ color: "#9FE1CB", fontSize: 12, letterSpacing: 1, fontWeight: 600 }}>DÉPÔT DE GARANTIE</span>
+                 <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20, color: "#fff", background: st.color }}>{st.label}</span>
+               </div>
+               <div style={{ color: "#fff", fontSize: 30, fontWeight: 800, marginTop: 4 }}>{fcfa(deposit)}</div>
+               {isReturned && <div style={{ color: "#9FE1CB", fontSize: 13, marginTop: 6 }}>Restitué : {fcfa(lease.deposit_returned || 0)}{lease.deposit_returned_at ? " · " + lease.deposit_returned_at : ""}</div>}
+             </div>
+   
+             {deposit === 0 && <div style={{ ...cardBox, color: C.mut, fontSize: 13, marginBottom: 14 }}>Aucune caution définie. Renseignez-la dans « Configurer le bail ».</div>}
+   
+             {/* retenues */}
+             <div style={cardBox}>
+               <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+                 <div style={{ ...fieldLabel, marginBottom: 0, flex: 1 }}>Retenues</div>
+                 {!isReturned && <button onClick={() => setAdding(true)} style={{ color: C.teal, fontWeight: 700, fontSize: 13, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}><Plus size={14} style={{ verticalAlign: "-2px" }} /> Ajouter</button>}
+               </div>
+               <div style={{ fontSize: 12, color: C.mut, marginBottom: 10 }}>Dégâts ou impayés déduits de la caution (liés à l'état des lieux de sortie).</div>
+               {deductions.length === 0
+                 ? <div style={{ fontSize: 13, color: C.mut }}>Aucune retenue.</div>
+                 : deductions.map((d) => (
+                   <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid " + C.line }}>
+                     <div style={{ flex: 1 }}>
+                       <div style={{ fontSize: 14, color: C.ink }}>{d.label}</div>
+                       {d.inspection_id && <div style={{ fontSize: 11.5, color: C.mut }}>Lié à un état des lieux</div>}
+                     </div>
+                     <span style={{ fontSize: 14, color: C.bad, fontWeight: 700 }}>-{fcfa(d.amount)}</span>
+                     {!isReturned && <button onClick={() => onRemoveDed(d.id)} style={{ border: "none", background: "transparent", color: C.bad, cursor: "pointer", padding: 2 }}><Trash2 size={14} /></button>}
+                   </div>
+                 ))}
+             </div>
+   
+             {/* net à restituer */}
+             <div style={{ background: C.tealSoft, borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.ink, marginBottom: 4 }}>
+                 <span>Caution</span><span>{fcfa(deposit)}</span>
+               </div>
+               {totalDed > 0 && (
+                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.bad, marginBottom: 4 }}>
+                   <span>Total retenues</span><span>-{fcfa(totalDed)}</span>
+                 </div>
+               )}
+               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: C.ink, borderTop: "1px solid rgba(0,0,0,.1)", paddingTop: 8, marginTop: 4 }}>
+                 <span>À restituer</span><span>{fcfa(net)}</span>
+               </div>
+             </div>
+   
+             {/* actions */}
+             {lease.deposit_status === "non_verse" && deposit > 0 && (
+               <button onClick={markHeld} style={{ ...primaryBtn, marginBottom: 10 }}>Marquer la caution reçue</button>
+             )}
+             {lease.deposit_status === "detenue" && (
+               <button onClick={restitute} style={{ ...primaryBtn, background: C.good, marginBottom: 10 }}>Restituer la caution ({fcfa(net)})</button>
+             )}
+             {isReturned && (
+               <div style={{ textAlign: "center", color: C.good, fontWeight: 700, fontSize: 14, padding: 10 }}>✓ Caution {st.label.toLowerCase()}</div>
+             )}
+           </>
+         )}
+   
+         {adding && <AddDeductionSheet exits={exits} onAdd={onAddDed} close={() => setAdding(false)} />}
+       </div>
+     );
+   }
+   
+   function AddDeductionSheet({ exits, onAdd, close }) {
+     const [label, setLabel] = useState("");
+     const [amount, setAmount] = useState("");
+     const [inspectionId, setInspectionId] = useState("");
+     const [busy, setBusy] = useState(false);
+     const SUGGEST = ["Réparation mur", "Nettoyage", "Loyer impayé", "Remplacement équipement"];
+     const submit = async () => { if (!label.trim() || !amount) return; setBusy(true); await onAdd({ label: label.trim(), amount: Number(amount), inspectionId: inspectionId || null }); setBusy(false); };
+     return (
+       <div onClick={close} style={overlay}>
+         <div onClick={(e) => e.stopPropagation()} style={sheet}>
+           <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 700, color: C.ink, marginBottom: 14 }}>Ajouter une retenue</div>
+           <div style={fieldLabel}>Motif</div>
+           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex : Réparation mur salon" style={input} />
+           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+             {SUGGEST.map((s) => <button key={s} onClick={() => setLabel(s)} style={{ border: "1px solid " + C.line, background: C.card, borderRadius: 20, padding: "5px 11px", fontSize: 12.5, color: C.ink, cursor: "pointer", fontFamily: "inherit" }}>{s}</button>)}
+           </div>
+           <div style={{ ...fieldLabel, marginTop: 16 }}>Montant (FCFA)</div>
+           <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="Ex : 25000" style={input} />
+           {exits && exits.length > 0 && (
+             <>
+               <div style={{ ...fieldLabel, marginTop: 16 }}>Lier à un état des lieux de sortie (facultatif)</div>
+               <select value={inspectionId} onChange={(e) => setInspectionId(e.target.value)} style={{ ...input, appearance: "auto" }}>
+                 <option value="">Aucun</option>
+                 {exits.map((ex) => <option key={ex.id} value={ex.id}>{ex.title || "État des lieux de sortie"}{ex.performed_at ? " · " + ex.performed_at : ""}</option>)}
+               </select>
+             </>
+           )}
+           <button onClick={submit} disabled={busy} style={{ ...primaryBtn, marginTop: 18, opacity: busy ? 0.6 : 1 }}>{busy ? "Ajout…" : "Ajouter la retenue"}</button>
+         </div>
+       </div>
+     );
+   }
+   
    /* ---- styles ---- */
    const iconBtn = { width: 38, height: 38, borderRadius: 11, border: "1px solid " + C.line, background: C.card, display: "grid", placeItems: "center", cursor: "pointer", color: C.ink };
    const cardBox = { background: C.card, border: "1px solid " + C.line, borderRadius: 16, padding: 16, marginBottom: 12 };
