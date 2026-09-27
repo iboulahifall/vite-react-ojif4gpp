@@ -20,6 +20,9 @@ import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierPage } from './pages/SupplierPage';
 import { ChiffragePage } from './pages/ChiffragePage';
 import { ChiffrageIndexPage } from './pages/ChiffrageIndexPage';
+import { RisksPage } from './pages/RisksPage';
+import { QuestionsPage } from './pages/QuestionsPage';
+import { QuestionsIndexPage, RisksIndexPage } from './pages/FollowUpIndexPages';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -45,6 +48,10 @@ function Routed() {
         <Route path="fournisseurs/:sid" element={<SupplierPage />} />
         <Route path="etudes/:id/chiffrage" element={<ChiffragePage />} />
         <Route path="chiffrage" element={<ChiffrageIndexPage />} />
+        <Route path="etudes/:id/risques" element={<RisksPage />} />
+        <Route path="etudes/:id/questions" element={<QuestionsPage />} />
+        <Route path="risques" element={<RisksIndexPage />} />
+        <Route path="questions" element={<QuestionsIndexPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

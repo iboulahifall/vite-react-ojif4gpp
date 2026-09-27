@@ -195,6 +195,10 @@ describe('analyse du DCE de démonstration', () => {
     expect(res.findings.some((f) => f.title === 'Pénalités sans plafond')).toBe(true);
     expect(res.findings.some((f) => f.title === 'Document annexe mentionné')).toBe(true);
     expect(res.findings.some((f) => f.title === 'Quantité à établir : 13.2.7')).toBe(true);
+    // Les risques et questions de démonstration pointent vers de vrais constats de l'analyse.
+    const linked = [...s.risks, ...s.questions].map((x) => x.source.findingId).filter(Boolean);
+    expect(linked.length).toBeGreaterThan(5);
+    for (const id of linked) expect(ids).toContain(id);
     const sum = summarize(res, {});
     expect(sum.critical).toBeGreaterThan(5);
     expect(sum.confirmed).toBeGreaterThan(20);

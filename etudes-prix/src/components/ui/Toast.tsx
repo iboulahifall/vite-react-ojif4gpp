@@ -7,7 +7,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<{ id: number; msg: string }[]>([]);
   const push = useCallback((msg: string) => {
     const id = Date.now() + Math.random();
-    setItems((p) => [...p, { id, msg }]);
+    // Au plus 3 messages à la fois : les plus anciens disparaissent.
+    setItems((p) => [...p, { id, msg }].slice(-3));
     setTimeout(() => setItems((p) => p.filter((i) => i.id !== id)), 3500);
   }, []);
   return (

@@ -43,6 +43,7 @@ import type { AnalysisResult, FindingDecision } from './analysis/types';
 import type { MetreLine } from './metre';
 import type { Consultation } from './consultations';
 import type { Chiffrage } from './chiffrage';
+import type { Question, Risk } from './risks';
 
 export interface DceDocDeclaration {
   type: DceDocType;
@@ -108,6 +109,9 @@ export interface Study {
   consultations: Consultation[];
   /** Chiffrage : prix des lignes du métré et paramètres de vente (V1.6). */
   chiffrage: Chiffrage;
+  /** Risques et questions au maître d'ouvrage (V1.7). */
+  risks: Risk[];
+  questions: Question[];
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -120,7 +124,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage' | 'risks' | 'questions'
 >;
 
 export interface AppSettings {

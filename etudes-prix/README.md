@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.6
+# Études de Prix CFO/CFA — V1.7
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -109,8 +109,22 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
   le prix de vente et tracée. **Export Excel** (détail + récapitulatif) et impression.
 - Le tableau de bord et les listes affichent le prix de vente chiffré (sinon le montant estimé).
 
-Les modules Risques, Questions, Revue et Rapports
-sont visibles dans le menu avec leur version prévue (V1.7 à V1.10).
+## Contenu de la V1.7 — Risques, questions et blocages
+
+- **Registre des risques** en trois colonnes (🔴 critique, 🟠 important, 🟡 à surveiller) : description, source
+  (lien vers la page du document), impact, montant potentiel, responsable, action, statut. Un risque critique
+  exige une action. **Exposition** totale comparée à la **provision pour aléas** du chiffrage.
+- **Questions au maître d'ouvrage** (Q-001…) : sujet, source, question, impact, question **bloquante** ;
+  envoi groupé (courriel prérempli), relances, **réponse**, sans objet ; liste imprimable.
+- Création en un clic depuis l'**analyse** : « → Question » et « → Risque » sur chaque constat, import de toutes
+  les questions proposées ; les liens sont affichés sur les constats.
+- **Ce qui bloque** : sur la fiche étude, liste unique des blocages de tous les modules (pièces manquantes,
+  points critiques, écarts de métré, fournisseurs à relancer, prix manquants, risques critiques, questions
+  bloquantes), chacun menant à la page où le traiter. Barre des modules avec l'état de chacun.
+- Risques critiques et questions ouvertes sont calculés automatiquement (tableau de bord, alertes, prochaine action).
+
+Les modules Revue, Validation et Rapports
+sont visibles dans le menu avec leur version prévue (V1.8 à V1.10).
 
 ## Architecture
 

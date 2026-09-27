@@ -149,7 +149,7 @@ describe('tableau de bord', () => {
 
   it('signale ce qui bloque', () => {
     const kinds = new Set(computeAlerts(studies, TODAY).map((a) => a.kind));
-    expect(kinds).toEqual(new Set(['overdue', 'due-soon', 'critical-risk', 'missing-dce', 'ready', 'relance']));
+    expect(kinds).toEqual(new Set(['overdue', 'due-soon', 'critical-risk', 'missing-dce', 'ready', 'relance', 'question']));
   });
 });
 

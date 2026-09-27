@@ -6,6 +6,7 @@ import { demoDocuments } from './demoFiles';
 import { buildDemoMetre } from './demoMetre';
 import { buildDemoConsultations } from './demoConsultations';
 import { buildDemoChiffrage } from './demoChiffrage';
+import { buildDemoFollowUp } from './demoFollowUp';
 import { emptyChiffrage } from '../domain/chiffrage';
 import { defaultDceDocs } from '../domain/studyFactory';
 import { STATUS_ORDER, progressForStatus, stageIndex } from '../domain/workflow';
@@ -97,6 +98,7 @@ export function buildDemoStudies(owner: string, today = new Date()): Study[] {
       metre: seed.withFiles ? buildDemoMetre(`demo-${i + 1}`, owner, iso) : [],
       consultations: seed.withFiles ? buildDemoConsultations(`demo-${i + 1}`, owner, today) : [],
       chiffrage: emptyChiffrage(),
+      ...(seed.withFiles ? buildDemoFollowUp(`demo-${i + 1}`, owner, today) : { risks: [], questions: [] }),
       plan,
       indicators: { criticalRisks: seed.critical ?? 0, openQuestions: seed.questions ?? 0, pendingPrices: seed.pending ?? 0 },
       notes: 'DONNÉES DE DÉMONSTRATION — projet fictif.',

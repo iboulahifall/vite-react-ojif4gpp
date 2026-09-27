@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  AlertOctagon, ArrowRight, BarChart3, Calculator, Calendar, Factory, FolderOpen, Ruler, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
+  AlertOctagon, ArrowRight, Calendar, FolderOpen, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
   Pencil, Plus, Printer, SkipBack, Target, Trash2, User,
 } from 'lucide-react';
 import { useStore, type TrackedChange } from '../state/store';
@@ -20,7 +20,9 @@ import { GuideBanner, HelpBox, InfoTip } from '../components/ui/Help';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import { WorkflowStepper } from '../components/WorkflowStepper';
-import { amountOf, pendingPricesOf } from '../domain/kpi';
+import { amountOf, criticalRisksOf, openQuestionsOf, pendingPricesOf } from '../domain/kpi';
+import { BlockersCard } from '../components/BlockersCard';
+import { StudyModulesNav } from '../components/StudyModulesNav';
 import { NextActionPill } from '../components/NextActionPill';
 import { PlanEditor } from '../components/study/PlanEditor';
 import { FamilyTree } from '../components/study/FamilyTree';
@@ -94,6 +96,11 @@ function StudyView({ study }: { study: Study }) {
   const families = useMemo(() => FAMILIES.filter((f) => study.families.includes(f.id)), [study.families]);
   const locked = study.status === 'remise';
   const dceSummary = useMemo(() => dceCompleteness(study), [study]);
+  const computed: Partial<Record<keyof StudyIndicators, { value: number; to: string }>> = {
+    criticalRisks: study.risks.length ? { value: criticalRisksOf(study), to: 'risques' } : undefined,
+    openQuestions: study.questions.length ? { value: openQuestionsOf(study), to: 'questions' } : undefined,
+    pendingPrices: study.consultations.length ? { value: pendingPricesOf(study), to: 'consultations' } : undefined,
+  };
 
   const confirm = (reason: string) => {
     if (!pending) return;
@@ -188,17 +195,14 @@ function StudyView({ study }: { study: Study }) {
         subtitle={<>{study.reference} · {MARKET_LABELS[study.marketType]} · {study.lots.map((l) => <Tag key={l} tone="brand">{l}</Tag>)}</>}
         actions={
           <>
-            <Button variant="secondary" icon={<FileText size={16} />} onClick={() => navigate(`/etudes/${study.id}/dce`)}>DCE ({study.documents.length})</Button>
-            <Button variant="secondary" icon={<BarChart3 size={16} />} onClick={() => navigate(`/etudes/${study.id}/analyse`)}>Analyse</Button>
-            <Button variant="secondary" icon={<Ruler size={16} />} onClick={() => navigate(`/etudes/${study.id}/metre`)}>Métré</Button>
-            <Button variant="secondary" icon={<Factory size={16} />} onClick={() => navigate(`/etudes/${study.id}/consultations`)}>Consultations</Button>
-            <Button variant="secondary" icon={<Calculator size={16} />} onClick={() => navigate(`/etudes/${study.id}/chiffrage`)}>Chiffrage</Button>
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)} disabled={locked}>Modifier</Button>
             <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => setPending({ kind: 'delete' })} aria-label="Supprimer l’étude" title="Supprimer l’étude" className="text-red-700 hover:bg-red-50" />
           </>
         }
       />
+
+      <StudyModulesNav study={study} />
 
       <GuideBanner
         step={`Étape ${idx + 1}/${STAGES.length}`}
@@ -215,7 +219,7 @@ function StudyView({ study }: { study: Study }) {
         )}
       >
         {stage.todo}{' '}
-        {!locked && <>Une fois l’étape terminée, cliquez sur <strong>Étape suivante</strong>. L’outil dédié à cette étape arrive en {stage.module}.</>}
+        {!locked && <>Une fois l’étape terminée, cliquez sur <strong>Étape suivante</strong>.{!stage.delivered && <> L’outil dédié à cette étape arrive en {stage.module}.</>}</>}
       </GuideBanner>
 
       <div className="no-print grid items-start gap-5 xl:grid-cols-3">
@@ -251,6 +255,7 @@ function StudyView({ study }: { study: Study }) {
         </Card>
 
         <div className="space-y-5">
+          <BlockersCard study={study} />
           <Card>
             <CardHeader icon={<Target size={18} />} title="Prochaine action" />
             <div className="space-y-2 p-5">
@@ -259,15 +264,15 @@ function StudyView({ study }: { study: Study }) {
             </div>
           </Card>
           <Card>
-            <CardHeader title="Indicateurs" subtitle={study.consultations.length ? 'Prix en attente calculés depuis les consultations' : 'Saisie manuelle'} />
+            <CardHeader title="Indicateurs" subtitle={Object.values(computed).some(Boolean) ? 'Calculés depuis les modules (sinon saisie manuelle)' : 'Saisie manuelle'} />
             <ul className="divide-y divide-slate-100">
               {INDICATORS.map((ind) => (
                 <li key={ind.key} className="flex items-center gap-3 px-5 py-3">
                   <span className={clsx('rounded-lg p-1.5', ind.tone)}>{ind.icon}</span>
                   <span className="flex-1 text-sm font-medium text-slate-700">{ind.label} <InfoTip text={ind.help} /></span>
-                  {ind.key === 'pendingPrices' && study.consultations.length > 0 ? (
-                    <Link to={`/etudes/${study.id}/consultations`} className="flex items-center gap-2 text-lg font-bold tabular text-brand-800 hover:underline" title="Calculé depuis les consultations">
-                      {pendingPricesOf(study)} <span className="text-xs font-normal text-slate-500">calculé</span>
+                  {computed[ind.key] ? (
+                    <Link to={`/etudes/${study.id}/${computed[ind.key]!.to}`} className="flex items-center gap-2 text-lg font-bold tabular text-brand-800 hover:underline" title="Calculé automatiquement">
+                      {computed[ind.key]!.value} <span className="text-xs font-normal text-slate-500">calculé</span>
                     </Link>
                   ) : (
                   <div className="flex items-center gap-1">
@@ -407,7 +412,7 @@ function StudyView({ study }: { study: Study }) {
           <PrintTable head={['Remise', 'Responsable', 'Montant estimé HT', 'Étape', 'Avancement', 'Risque']}
             rows={[[`${formatDate(study.dueDate)} à ${study.dueTime}`, study.owner, formatEuro(amountOf(study)), `${idx + 1}/7 · ${stage.label}`, `${study.progress} %`, RISK_LABELS[study.riskLevel]]]} />
           <p className="mt-2"><strong>Prochaine action :</strong> {action.label} — {action.reason}</p>
-          <p><strong>Indicateurs :</strong> {study.indicators.criticalRisks} risque(s) critique(s) · {study.indicators.openQuestions} question(s) ouverte(s) · {pendingPricesOf(study)} prix en attente</p>
+          <p><strong>Indicateurs :</strong> {criticalRisksOf(study)} risque(s) critique(s) · {openQuestionsOf(study)} question(s) ouverte(s) · {pendingPricesOf(study)} prix en attente</p>
         </PrintSection>
         <PrintSection title="Plan de travail">
           <PrintTable head={['#', 'Tâche', 'Étape', 'Échéance', 'État']} align={['right', 'left', 'left', 'left', 'left']}

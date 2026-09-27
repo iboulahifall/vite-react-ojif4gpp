@@ -5,6 +5,7 @@ import { summarize } from './analysis/summary';
 import { metreSummary } from './metre';
 import { consultationSummary } from './consultations';
 import { buildUp } from './chiffrage';
+import { isQuestionLate, riskSummary } from './risks';
 
 export interface StageInfo {
   id: StudyStatus;
@@ -16,22 +17,24 @@ export interface StageInfo {
   todo: string;
   /** Version du module qui outillera cette étape. */
   module: string;
+  /** Le module outillant l'étape est livré. */
+  delivered: boolean;
 }
 
 export const STAGES: StageInfo[] = [
-  { id: 'analyse', label: 'Analyse DCE', short: 'Analyse', minProgress: 0, module: 'V1.2 / V1.3',
+  { id: 'analyse', label: 'Analyse DCE', short: 'Analyse', minProgress: 0, module: 'V1.2 / V1.3', delivered: true,
     todo: 'Lire le DCE, vérifier les pièces, repérer les prestations et les points critiques.' },
-  { id: 'metre', label: 'Métré', short: 'Métré', minProgress: 20, module: 'V1.4',
+  { id: 'metre', label: 'Métré', short: 'Métré', minProgress: 20, module: 'V1.4', delivered: true,
     todo: 'Établir et contrôler les quantités CFO/CFA par rapport à la DPGF et aux plans.' },
-  { id: 'consultation', label: 'Consultations', short: 'Consultation', minProgress: 35, module: 'V1.5',
+  { id: 'consultation', label: 'Consultations', short: 'Consultation', minProgress: 35, module: 'V1.5', delivered: true,
     todo: 'Consulter fournisseurs et sous-traitants, relancer, comparer les offres.' },
-  { id: 'chiffrage', label: 'Chiffrage', short: 'Chiffrage', minProgress: 55, module: 'V1.6',
+  { id: 'chiffrage', label: 'Chiffrage', short: 'Chiffrage', minProgress: 55, module: 'V1.6', delivered: true,
     todo: 'Calculer le déboursé sec, intégrer la main-d’œuvre et les frais, fixer le prix de vente.' },
-  { id: 'revue', label: 'Revue de prix', short: 'Revue', minProgress: 75, module: 'V1.8',
+  { id: 'revue', label: 'Revue de prix', short: 'Revue', minProgress: 75, module: 'V1.8', delivered: false,
     todo: 'Contrôler la cohérence du chiffrage : quantités, prix, risques, oublis.' },
-  { id: 'validation', label: 'Validation', short: 'Validation', minProgress: 90, module: 'V1.9',
+  { id: 'validation', label: 'Validation', short: 'Validation', minProgress: 90, module: 'V1.9', delivered: false,
     todo: 'Valider l’étude avec la direction et préparer le dossier de remise.' },
-  { id: 'remise', label: 'Remise', short: 'Remise', minProgress: 100, module: 'V1.10',
+  { id: 'remise', label: 'Remise', short: 'Remise', minProgress: 100, module: 'V1.10', delivered: false,
     todo: 'Offre remise au client. L’étude est terminée.' },
 ];
 
@@ -125,8 +128,13 @@ export function nextAction(study: Study, today = new Date()): NextAction {
     if (b.missing > 0) return { label: 'Compléter les prix', tone: 'warning', reason: `${b.missing} ligne(s) sans prix.` };
     if (b.toConfirm + b.estimated > 0) return { label: 'Confirmer les prix', tone: 'info', reason: `${b.toConfirm} prix à confirmer et ${b.estimated} prix estimé(s).` };
   }
-  if (study.indicators.criticalRisks > 0 && (study.status === 'revue' || study.status === 'validation')) {
-    return { label: 'Traiter les risques', tone: 'danger', reason: `${study.indicators.criticalRisks} risque(s) critique(s) avant validation.` };
+  const critical = study.risks?.length ? riskSummary(study.risks).critical : study.indicators.criticalRisks;
+  if (critical > 0 && (study.status === 'revue' || study.status === 'validation')) {
+    return { label: 'Traiter les risques', tone: 'danger', reason: `${critical} risque(s) critique(s) avant validation.` };
+  }
+  const lateBlocking = (study.questions ?? []).filter((q) => q.blocking && isQuestionLate(q, today));
+  if (lateBlocking.length) {
+    return { label: 'Relancer le maître d’ouvrage', tone: 'warning', reason: `${lateBlocking.length} question(s) bloquante(s) sans réponse après la date attendue.` };
   }
   switch (study.status) {
     case 'analyse': return { label: 'Analyser le DCE', tone: 'info', reason: stageOf('analyse').todo };

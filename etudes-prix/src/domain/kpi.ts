@@ -3,6 +3,7 @@ import { STAGES, isActive, nextAction, RISK_ORDER } from './workflow';
 import { daysUntil } from './dates';
 import { consultationSummary } from './consultations';
 import { buildUp } from './chiffrage';
+import { isQuestionLate, questionCode, questionSummary, riskSummary } from './risks';
 import { missingDocs } from './catalog';
 
 /**
@@ -13,6 +14,16 @@ export function pendingPricesOf(s: Study, today = new Date()): number {
   if (!s.consultations?.length) return s.indicators.pendingPrices;
   const sum = consultationSummary(s.consultations, today);
   return sum.waiting + sum.toSend;
+}
+
+/** Risques critiques actifs : calculés depuis le registre des risques s'il existe, sinon saisie manuelle. */
+export function criticalRisksOf(s: Study): number {
+  return s.risks?.length ? riskSummary(s.risks).critical : s.indicators.criticalRisks;
+}
+
+/** Questions ouvertes : calculées depuis le suivi des questions s'il existe, sinon saisie manuelle. */
+export function openQuestionsOf(s: Study, today = new Date()): number {
+  return s.questions?.length ? questionSummary(s.questions, today).open : s.indicators.openQuestions;
 }
 
 /** Demandes de prix sans réponse après la date attendue. */
@@ -58,7 +69,7 @@ export function computeKpis(studies: Study[], today = new Date()): DashboardKpis
     dueSoonCount: active.filter((s) => isDueSoon(s, today)).length,
     overdueCount: active.filter((s) => isOverdue(s, today)).length,
     activeAmount: active.reduce((sum, s) => sum + amountOf(s), 0),
-    criticalRisks: active.reduce((sum, s) => sum + s.indicators.criticalRisks, 0),
+    criticalRisks: active.reduce((sum, s) => sum + criticalRisksOf(s), 0),
     pendingPrices: active.reduce((sum, s) => sum + pendingPricesOf(s, today), 0),
     readyToValidate: active.filter((s) => s.status === 'validation').length,
   };
@@ -88,7 +99,7 @@ export function sortByPriority(studies: Study[], today = new Date()): Study[] {
     });
 }
 
-export type AlertKind = 'overdue' | 'due-soon' | 'critical-risk' | 'missing-dce' | 'ready' | 'relance';
+export type AlertKind = 'overdue' | 'due-soon' | 'critical-risk' | 'missing-dce' | 'ready' | 'relance' | 'question';
 
 export interface Alert {
   kind: AlertKind;
@@ -109,9 +120,13 @@ export function computeAlerts(studies: Study[], today = new Date()): Alert[] {
       alerts.push({ kind: 'due-soon', studyId: s.id, studyName: s.name, level: days <= 2 ? 'critique' : 'important',
         message: days === 0 ? 'Remise aujourd’hui' : `Remise dans ${days} j` });
     }
-    if (s.indicators.criticalRisks > 0) {
+    const critical = criticalRisksOf(s);
+    if (critical > 0) {
       alerts.push({ kind: 'critical-risk', studyId: s.id, studyName: s.name, level: 'critique',
-        message: `${s.indicators.criticalRisks} risque(s) critique(s)` });
+        message: `${critical} risque(s) critique(s)` });
+    }
+    for (const q of (s.questions ?? []).filter((x) => x.blocking && isQuestionLate(x, today))) {
+      alerts.push({ kind: 'question', studyId: s.id, studyName: s.name, level: 'important', message: `${questionCode(q)} sans réponse — à relancer` });
     }
     const missing = missingDocs(s.dceDocs, s.lots).length;
     if (missing > 0) {

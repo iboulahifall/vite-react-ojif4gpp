@@ -20,6 +20,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import { CATEGORY_LABELS, FindingCard } from '../components/analysis/FindingCard';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { questionCode, riskCode } from '../domain/risks';
 
 export function AnalysePage() {
   const { id = '' } = useParams();
@@ -63,7 +64,7 @@ function SummaryCard({ tone, icon, label, value, hint, active, onClick }: {
 }
 
 function AnalyseView({ study }: { study: Study }) {
-  const { runAnalysis, decideFinding } = useStore();
+  const { runAnalysis, decideFinding, questionsFromFindings, riskFromFinding } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -243,7 +244,13 @@ function AnalyseView({ study }: { study: Study }) {
                   <div className="grid gap-3 xl:grid-cols-2">
                     {visible.map((f) => (
                       <FindingCard key={f.id} finding={f} decision={decisions[f.id]} studyId={study.id} locked={locked}
-                        onDecide={(status) => status === 'ouvert' ? decideFinding(study.id, f.id, 'ouvert', 'Réouverture') : setPendingDecision({ finding: f, status })} />
+                        onDecide={(status) => status === 'ouvert' ? decideFinding(study.id, f.id, 'ouvert', 'Réouverture') : setPendingDecision({ finding: f, status })}
+                        linked={{
+                          question: study.questions.find((q) => q.source.findingId === f.id) ? questionCode(study.questions.find((q) => q.source.findingId === f.id)!) : undefined,
+                          risk: study.risks.find((r) => r.source.findingId === f.id) ? riskCode(study.risks.find((r) => r.source.findingId === f.id)!) : undefined,
+                        }}
+                        onToQuestion={() => { const n = questionsFromFindings(study.id, [f.id]); if (n) toast('Question créée — à envoyer (menu Questions)'); }}
+                        onToRisk={() => { const r = riskFromFinding(study.id, f.id); if (r) toast(`${riskCode(r)} créé — complétez montant et action (menu Risques)`); }} />
                     ))}
                   </div>
                 </div>

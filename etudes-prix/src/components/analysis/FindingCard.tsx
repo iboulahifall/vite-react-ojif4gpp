@@ -15,12 +15,16 @@ export const CATEGORY_LABELS: Record<Finding['category'], string> = {
   document: 'Document',
 };
 
-export function FindingCard({ finding, decision, studyId, locked, onDecide }: {
+export function FindingCard({ finding, decision, studyId, locked, onDecide, linked, onToQuestion, onToRisk }: {
   finding: Finding;
   decision?: FindingDecision;
   studyId: string;
   locked?: boolean;
   onDecide: (status: FindingStatus) => void;
+  /** Codes de la question / du risque déjà créés à partir de ce constat. */
+  linked?: { question?: string; risk?: string };
+  onToQuestion?: () => void;
+  onToRisk?: () => void;
 }) {
   const status = decision?.status ?? 'ouvert';
   const s = finding.source;
@@ -55,7 +59,11 @@ export function FindingCard({ finding, decision, studyId, locked, onDecide }: {
             <FileSearch size={14} /> {sourceLabel(s)}
           </Link>
         )}
+        {linked?.question && <Link to={`/etudes/${studyId}/questions`} className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-800 hover:underline">{linked.question}</Link>}
+        {linked?.risk && <Link to={`/etudes/${studyId}/risques`} className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-800 hover:underline">{linked.risk}</Link>}
         <span className="flex-1" />
+        {!locked && status === 'ouvert' && finding.question && !linked?.question && onToQuestion && <Button size="sm" variant="ghost" onClick={onToQuestion}>→ Question</Button>}
+        {!locked && status === 'ouvert' && !linked?.risk && onToRisk && finding.category !== 'document' && <Button size="sm" variant="ghost" onClick={onToRisk}>→ Risque</Button>}
         {!locked && (status === 'ouvert' ? (
           <>
             <Button size="sm" variant="ghost" onClick={() => onDecide('ecarte')}>Écarter</Button>

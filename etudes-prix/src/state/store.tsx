@@ -17,6 +17,8 @@ import { formatEuro } from '../domain/format';
 import { toISODate } from '../domain/dates';
 import { buildUp, emptyChiffrage, lineCost, type PriceLine, type PricingParams } from '../domain/chiffrage';
 import { baseLineFor, importRetainedOffers, type OfferImport } from '../domain/priceBase';
+import { nextNumber, questionCode, QUESTION_STATUS_LABELS, riskCode, RISK_STATUS_LABELS, type Question, type QuestionStatus, type Risk } from '../domain/risks';
+import { sourceLabel } from '../domain/analysis/analyse';
 import { LocalStudyRepository, type StudyRepository } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
@@ -87,6 +89,18 @@ interface StoreValue {
   setPricingParams(studyId: string, params: PricingParams, reason: string): void;
   applyBasePrices(studyId: string): number;
   importOffers(studyId: string): OfferImport;
+  /** Risques et questions (V1.7). */
+  saveRisk(studyId: string, risk: Omit<Risk, 'id' | 'number' | 'createdAt'> & { id?: string }, reason: string): Risk | null;
+  deleteRisk(studyId: string, id: string, reason: string): void;
+  saveQuestion(studyId: string, q: Omit<Question, 'id' | 'number' | 'createdAt' | 'reminders' | 'status'> & { id?: string; status?: QuestionStatus }, reason: string): Question | null;
+  deleteQuestion(studyId: string, id: string, reason: string): void;
+  sendQuestions(studyId: string, ids: string[], dueDate: string): void;
+  remindQuestion(studyId: string, id: string, note: string): void;
+  answerQuestion(studyId: string, id: string, text: string, date: string): void;
+  setQuestionStatus(studyId: string, id: string, status: QuestionStatus, reason: string): void;
+  /** Crée des questions (ou des risques) à partir des constats de l'analyse du DCE. */
+  questionsFromFindings(studyId: string, findingIds: string[]): number;
+  riskFromFinding(studyId: string, findingId: string): Risk | null;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -113,7 +127,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       setSuppliers(storedSuppliers ?? buildDemoSuppliers());
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage() })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage(), risks: st.risks ?? [], questions: st.questions ?? [] })));
       loaded.current = true;
       setReady(true);
     })();
@@ -448,6 +462,105 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
             [{ field: 'Chiffrage — offres retenues', oldValue: formatEuro(pvBefore), newValue: `${formatEuro(pvAfter)} (${res.applied} ligne(s) mise(s) à jour)` }], 'Report des offres retenues');
         }
         return res;
+      },
+      saveRisk(studyId, data, reason) {
+        const s = getStudy(studyId);
+        if (!s) return null;
+        const prev = data.id ? s.risks.find((r) => r.id === data.id) : undefined;
+        const risk: Risk = prev ? { ...prev, ...data, id: prev.id } : { ...data, id: newId('risk'), number: nextNumber(s.risks), createdAt: new Date().toISOString() } as Risk;
+        const changes: TrackedChange[] = prev
+          ? [
+              ...(prev.status !== risk.status ? [{ field: `Risque ${riskCode(risk)} — statut`, oldValue: RISK_STATUS_LABELS[prev.status], newValue: RISK_STATUS_LABELS[risk.status], target: risk.id }] : []),
+              ...(prev.level !== risk.level ? [{ field: `Risque ${riskCode(risk)} — niveau`, oldValue: prev.level, newValue: risk.level, target: risk.id }] : []),
+              ...(prev.amount !== risk.amount ? [{ field: `Risque ${riskCode(risk)} — montant`, oldValue: prev.amount === null ? '—' : formatEuro(prev.amount), newValue: risk.amount === null ? '—' : formatEuro(risk.amount), target: risk.id }] : []),
+              ...(prev.action !== risk.action ? [{ field: `Risque ${riskCode(risk)} — action`, oldValue: prev.action || '—', newValue: risk.action || '—', target: risk.id }] : []),
+              ...(prev.title !== risk.title || prev.description !== risk.description || prev.impact !== risk.impact || prev.owner !== risk.owner || prev.category !== risk.category
+                ? [{ field: `Risque ${riskCode(risk)}`, oldValue: '—', newValue: 'fiche modifiée', target: risk.id }] : []),
+            ]
+          : [{ field: `Risque ${riskCode(risk)} créé`, oldValue: '—', newValue: `${risk.title} (${risk.level})`, target: risk.id }];
+        if (!changes.length) return risk;
+        updateStudy(studyId, (cur) => ({ risks: prev ? cur.risks.map((r) => (r.id === risk.id ? risk : r)) : [...cur.risks, risk] }), changes, reason);
+        return risk;
+      },
+      deleteRisk(studyId, id, reason) {
+        const r = getStudy(studyId)?.risks.find((x) => x.id === id);
+        if (!r) return;
+        updateStudy(studyId, (cur) => ({ risks: cur.risks.filter((x) => x.id !== id) }), [{ field: `Risque ${riskCode(r)} supprimé`, oldValue: r.title, newValue: 'supprimé', target: id }], reason);
+      },
+      saveQuestion(studyId, data, reason) {
+        const s = getStudy(studyId);
+        if (!s) return null;
+        const prev = data.id ? s.questions.find((q) => q.id === data.id) : undefined;
+        const q: Question = prev
+          ? { ...prev, ...data, id: prev.id, status: data.status ?? prev.status }
+          : { ...data, id: newId('q'), number: nextNumber(s.questions), status: data.status ?? 'a-envoyer', reminders: [], createdAt: new Date().toISOString() } as Question;
+        updateStudy(studyId, (cur) => ({ questions: prev ? cur.questions.map((x) => (x.id === q.id ? q : x)) : [...cur.questions, q] }),
+          [{ field: prev ? `Question ${questionCode(q)} modifiée` : `Question ${questionCode(q)} créée`, oldValue: '—', newValue: q.subject, target: q.id }], reason);
+        return q;
+      },
+      deleteQuestion(studyId, id, reason) {
+        const q = getStudy(studyId)?.questions.find((x) => x.id === id);
+        if (!q) return;
+        updateStudy(studyId, (cur) => ({ questions: cur.questions.filter((x) => x.id !== id) }), [{ field: `Question ${questionCode(q)} supprimée`, oldValue: q.subject, newValue: 'supprimée', target: id }], reason);
+      },
+      sendQuestions(studyId, ids, dueDate) {
+        const s = getStudy(studyId);
+        if (!s) return;
+        const today = toISODate(new Date());
+        const sent = s.questions.filter((q) => ids.includes(q.id) && q.status === 'a-envoyer');
+        if (!sent.length) return;
+        updateStudy(studyId, (cur) => ({ questions: cur.questions.map((q) => (ids.includes(q.id) && q.status === 'a-envoyer' ? { ...q, status: 'en-attente', sentAt: today, dueDate } : q)) }),
+          sent.map((q) => ({ field: `Question ${questionCode(q)}`, oldValue: 'À envoyer', newValue: 'Envoyée', target: q.id })), 'Envoi au maître d’ouvrage');
+      },
+      remindQuestion(studyId, id, note) {
+        const q = getStudy(studyId)?.questions.find((x) => x.id === id);
+        if (!q) return;
+        const at = new Date().toISOString();
+        updateStudy(studyId, (cur) => ({ questions: cur.questions.map((x) => (x.id === id ? { ...x, status: 'relancee', reminders: [...x.reminders, { at, by: settings.userName, note }] } : x)) }),
+          [{ field: `Question ${questionCode(q)}`, oldValue: QUESTION_STATUS_LABELS[q.status], newValue: `Relance n°${q.reminders.length + 1}`, target: id }], note || 'Relance');
+      },
+      answerQuestion(studyId, id, text, date) {
+        const q = getStudy(studyId)?.questions.find((x) => x.id === id);
+        if (!q) return;
+        updateStudy(studyId, (cur) => ({ questions: cur.questions.map((x) => (x.id === id ? { ...x, status: 'repondue', answer: { text, date, by: settings.userName } } : x)) }),
+          [{ field: `Question ${questionCode(q)}`, oldValue: QUESTION_STATUS_LABELS[q.status], newValue: 'Répondue', target: id }], text.slice(0, 120));
+      },
+      setQuestionStatus(studyId, id, status, reason) {
+        const q = getStudy(studyId)?.questions.find((x) => x.id === id);
+        if (!q || q.status === status) return;
+        updateStudy(studyId, (cur) => ({ questions: cur.questions.map((x) => (x.id === id ? { ...x, status, answer: status === 'repondue' ? x.answer : undefined } : x)) }),
+          [{ field: `Question ${questionCode(q)}`, oldValue: QUESTION_STATUS_LABELS[q.status], newValue: QUESTION_STATUS_LABELS[status], target: id }], reason);
+      },
+      questionsFromFindings(studyId, findingIds) {
+        const s = getStudy(studyId);
+        if (!s?.analysis) return 0;
+        let n = nextNumber(s.questions);
+        const created: Question[] = s.analysis.findings
+          .filter((f) => findingIds.includes(f.id) && f.question && !s.questions.some((q) => q.source.findingId === f.id))
+          .map((f) => ({
+            id: newId('q'), number: n++, subject: f.title.replace(/^(Absent de la DPGF|Non décrit au CCTP) : /, ''), text: f.question!,
+            source: { label: sourceLabel(f.source), docId: f.source?.docId, page: f.source?.page, findingId: f.id },
+            impact: '', blocking: f.level === 'critique', status: 'a-envoyer' as QuestionStatus, reminders: [], createdAt: new Date().toISOString(),
+          }));
+        if (created.length) {
+          updateStudy(studyId, (cur) => ({ questions: [...cur.questions, ...created] }),
+            [{ field: 'Questions', oldValue: '—', newValue: `${created.length} question(s) créée(s) depuis l’analyse (${created.map(questionCode).join(', ')})` }], 'Import depuis l’analyse');
+        }
+        return created.length;
+      },
+      riskFromFinding(studyId, findingId) {
+        const s = getStudy(studyId);
+        const f = s?.analysis?.findings.find((x) => x.id === findingId);
+        if (!s || !f || s.risks.some((r) => r.source.findingId === findingId)) return null;
+        const risk: Risk = {
+          id: newId('risk'), number: nextNumber(s.risks), title: f.title, description: f.excerpt ?? f.detail,
+          level: f.level === 'critique' ? 'critique' : 'important',
+          category: f.category === 'clause' ? 'contractuel' : f.category === 'ecart' || f.category === 'quantite' ? 'financier' : 'technique',
+          source: { label: sourceLabel(f.source), docId: f.source?.docId, page: f.source?.page, findingId: f.id },
+          impact: f.detail, amount: null, owner: settings.userName, action: '', status: 'ouvert', createdAt: new Date().toISOString(),
+        };
+        updateStudy(studyId, (cur) => ({ risks: [...cur.risks, risk] }), [{ field: `Risque ${riskCode(risk)} créé`, oldValue: '—', newValue: `${risk.title} (depuis l’analyse)`, target: risk.id }], 'Import depuis l’analyse');
+        return risk;
       },
       async initMetre(studyId) {
         const s = getStudy(studyId);
