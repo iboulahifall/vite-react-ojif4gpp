@@ -26,6 +26,7 @@ import { PriceLineModal } from '../components/chiffrage/PriceLineModal';
 import { chiffrageWorkbook } from '../lib/exportChiffrage';
 import { downloadBlob } from '../lib/download';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 export function ChiffragePage() {
   const { id = '' } = useParams();
@@ -74,7 +75,7 @@ function ChiffrageView({ study }: { study: Study }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [params, setParams] = useState<PricingParams>(study.chiffrage.params);
   const [target, setTarget] = useState('');
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const ch = study.chiffrage;
   const b = useMemo(() => buildUp(study.metre, ch), [study.metre, ch]);
   const paramsDirty = JSON.stringify(params) !== JSON.stringify(ch.params);

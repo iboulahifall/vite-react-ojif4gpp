@@ -21,6 +21,7 @@ import { RequestStatusBadge } from '../components/consultations/RequestStatusBad
 import { ConsultationFormModal } from '../components/consultations/ConsultationFormModal';
 import { useRequestActions } from '../components/consultations/useRequestActions';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 export function ConsultationsPage() {
   const { id = '' } = useParams();
@@ -50,7 +51,7 @@ function ConsultationCard({ study, c, actions }: { study: Study; c: Consultation
   const state = consultationState(c);
   const cmp = compareOffers(c, study.metre);
   const due = daysUntil(c.dueDate);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   return (
     <Card className="flex flex-col">
       <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
@@ -112,7 +113,7 @@ function ConsultationsView({ study }: { study: Study }) {
   const [creating, setCreating] = useState<string | false>(false);
   const summary = useMemo(() => consultationSummary(study.consultations), [study.consultations]);
   const uncovered = uncoveredFamilies(study.families, study.consultations);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const sorted = useMemo(() => [...study.consultations].sort((a, b) => {
     const order = { danger: 0, warning: 1, info: 2, success: 3 };
     return order[consultationState(a).tone] - order[consultationState(b).tone] || a.dueDate.localeCompare(b.dueDate);

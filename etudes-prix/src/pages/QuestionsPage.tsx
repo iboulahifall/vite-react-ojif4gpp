@@ -21,6 +21,7 @@ import { useToast } from '../components/ui/Toast';
 import { KpiCard } from '../components/KpiCard';
 import { AnswerModal, QuestionFormModal, RemindQuestionModal, SendQuestionsModal } from '../components/followup/QuestionModals';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 export function QuestionsPage() {
   const { id = '' } = useParams();
@@ -53,7 +54,7 @@ function QuestionsView({ study }: { study: Study }) {
   const [reminding, setReminding] = useState<Question | null>(null);
   const [sending, setSending] = useState(false);
   const [pending, setPending] = useState<{ kind: 'delete' | 'sans-objet' | 'rouvrir'; q: Question } | null>(null);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const sum = questionSummary(study.questions);
   const toSend = study.questions.filter((q) => q.status === 'a-envoyer');
   const proposals = useMemo(() => (study.analysis?.findings ?? []).filter((f) =>

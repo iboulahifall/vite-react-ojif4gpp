@@ -4,6 +4,7 @@ import { FlaskConical, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useStore } from '../../state/store';
+import { LockBanner } from '../LockBanner';
 
 export function AppLayout() {
   const [drawer, setDrawer] = useState(false);
@@ -34,6 +35,7 @@ export function AppLayout() {
         </div>
       )}
       <main className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
+        <LockBanner />
         <Outlet />
       </main>
     </div>

@@ -30,6 +30,7 @@ import { DceStatusBadge } from '../components/dce/DceStatusBadge';
 import { dceCompleteness, dceStatus } from '../domain/documents';
 import { EditStudyModal } from '../components/study/EditStudyModal';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 type Pending =
   | { kind: 'status'; to: StudyStatus }
@@ -89,12 +90,13 @@ function StudyView({ study }: { study: Study }) {
 
   const stage = stageOf(study.status);
   const idx = stageIndex(study.status);
-  const next = nextStatus(study.status);
+  // La remise passe par la validation finale (page Validation), pas par le simple changement d'étape.
+  const next = study.status === 'validation' ? null : nextStatus(study.status);
   const prev = previousStatus(study.status);
   const action = nextAction(study);
   const days = daysUntil(study.dueDate);
   const families = useMemo(() => FAMILIES.filter((f) => study.families.includes(f.id)), [study.families]);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const dceSummary = useMemo(() => dceCompleteness(study), [study]);
   const computed: Partial<Record<keyof StudyIndicators, { value: number; to: string }>> = {
     criticalRisks: study.risks.length ? { value: criticalRisksOf(study), to: 'risques' } : undefined,
@@ -206,20 +208,29 @@ function StudyView({ study }: { study: Study }) {
 
       <GuideBanner
         step={`Étape ${idx + 1}/${STAGES.length}`}
-        title={`${stage.label} — ${locked ? 'étude terminée' : 'que faire maintenant ?'}`}
-        action={!locked && (
+        title={`${stage.label} — ${study.status === 'remise' ? 'étude terminée' : study.validation ? `étude validée (V${study.validation.version}), en lecture seule` : 'que faire maintenant ?'}`}
+        action={study.validation && study.status !== 'remise' ? (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/validation`)}>Voir la validation</Button>
+            <Button size="sm" onClick={() => navigate(`/etudes/${study.id}/rapport`)}>Dossier final</Button>
+          </>
+        ) : !locked && (
           <>
             {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/dce`)}>Ouvrir le DCE</Button>}
             {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/analyse`)}>Analyser</Button>}
             {study.status === 'metre' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/metre`)}>Ouvrir le métré</Button>}
             {study.status === 'consultation' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/consultations`)}>Ouvrir les consultations</Button>}
             {study.status === 'chiffrage' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/chiffrage`)}>Ouvrir le chiffrage</Button>}
+            {study.status === 'revue' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/revue`)}>Ouvrir la revue</Button>}
+            {study.status === 'validation' && <Button size="sm" onClick={() => navigate(`/etudes/${study.id}/validation`)}>Valider l’étude <ArrowRight size={14} /></Button>}
             {next && <Button size="sm" onClick={() => setPending({ kind: 'status', to: next })}>Étape suivante <ArrowRight size={14} /></Button>}
           </>
         )}
       >
         {stage.todo}{' '}
-        {!locked && <>Une fois l’étape terminée, cliquez sur <strong>Étape suivante</strong>.{!stage.delivered && <> L’outil dédié à cette étape arrive en {stage.module}.</>}</>}
+        {!locked && (study.status === 'validation'
+          ? <>Ouvrez la page <strong>Validation</strong> : relisez le récapitulatif, cochez les points de contrôle, puis validez l’étude.</>
+          : <>Une fois l’étape terminée, cliquez sur <strong>Étape suivante</strong>.{!stage.delivered && <> L’outil dédié à cette étape arrive en {stage.module}.</>}</>)}
       </GuideBanner>
 
       <div className="no-print grid items-start gap-5 xl:grid-cols-3">
@@ -244,7 +255,10 @@ function StudyView({ study }: { study: Study }) {
             <ProgressBar value={study.progress} size="lg" />
           </div>
           <div className="border-t border-slate-100 px-5 pb-4 pt-5">
-            <WorkflowStepper status={study.status} onSelect={locked ? undefined : (s) => s !== study.status && setPending({ kind: 'status', to: s })} />
+            <WorkflowStepper status={study.status} onSelect={locked ? undefined : (s) => {
+              if (s === 'remise') { toast('La remise se fait après la validation finale'); navigate(`/etudes/${study.id}/validation`); return; }
+              if (s !== study.status) setPending({ kind: 'status', to: s });
+            }} />
             {!locked && (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 {prev && <Button variant="ghost" size="sm" icon={<SkipBack size={14} />} onClick={() => setPending({ kind: 'status', to: prev })}>Revenir à « {stageOf(prev).short} »</Button>}

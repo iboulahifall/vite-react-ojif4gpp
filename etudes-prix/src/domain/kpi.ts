@@ -62,6 +62,11 @@ export function isOverdue(s: Study, today = new Date()): boolean {
   return isActive(s) && daysUntil(s.dueDate, today) < 0;
 }
 
+/** Revue de prix à jour et sans contrôle bloquant, étude pas encore validée. */
+export function isReadyToValidate(s: Study, today = new Date()): boolean {
+  return ['Valider', 'Passer à la validation'].includes(nextAction(s, today).label);
+}
+
 export function computeKpis(studies: Study[], today = new Date()): DashboardKpis {
   const active = studies.filter(isActive);
   return {
@@ -71,7 +76,7 @@ export function computeKpis(studies: Study[], today = new Date()): DashboardKpis
     activeAmount: active.reduce((sum, s) => sum + amountOf(s), 0),
     criticalRisks: active.reduce((sum, s) => sum + criticalRisksOf(s), 0),
     pendingPrices: active.reduce((sum, s) => sum + pendingPricesOf(s, today), 0),
-    readyToValidate: active.filter((s) => s.status === 'validation').length,
+    readyToValidate: active.filter((s) => isReadyToValidate(s, today)).length,
   };
 }
 
@@ -137,7 +142,7 @@ export function computeAlerts(studies: Study[], today = new Date()): Alert[] {
     if (late > 0) {
       alerts.push({ kind: 'relance', studyId: s.id, studyName: s.name, level: 'important', message: `${late} fournisseur(s) à relancer` });
     }
-    if (nextAction(s, today).label === 'Valider') {
+    if (isReadyToValidate(s, today)) {
       alerts.push({ kind: 'ready', studyId: s.id, studyName: s.name, level: 'ok', message: 'Prête à être validée' });
     }
   }

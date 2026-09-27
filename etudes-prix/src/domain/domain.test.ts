@@ -47,7 +47,7 @@ describe('workflow', () => {
     expect(nextAction(study({ dueDate: '2026-09-20' }), TODAY).label).toBe('Échéance dépassée');
     expect(nextAction(study({ dueDate: '2026-10-20' }), TODAY).label).toBe('Compléter le DCE');
     expect(nextAction(study({ dueDate: '2026-10-20', status: 'consultation', indicators: { criticalRisks: 0, openQuestions: 0, pendingPrices: 2 } }), TODAY).label).toBe('Relancer');
-    expect(nextAction(study({ dueDate: '2026-10-20', status: 'validation' }), TODAY).label).toBe('Valider');
+    expect(nextAction(study({ dueDate: '2026-10-20', status: 'validation' }), TODAY).label).toBe('Lancer la revue');
     expect(nextAction(study({ status: 'remise' }), TODAY).label).toBe('Aucune');
   });
 
@@ -131,7 +131,7 @@ describe('tableau de bord', () => {
     expect(amountOf(studies[1])).toBe(studies[1].estimatedAmount);
     expect(k.overdueCount).toBe(1);
     expect(k.dueSoonCount).toBe(4); // J-2, J-4, J-5, J-6
-    expect(k.readyToValidate).toBe(1);
+    expect(k.readyToValidate).toBe(0); // aucune revue de prix lancée dans la démonstration
   });
 
   it('compte les études par étape', () => {
@@ -149,7 +149,7 @@ describe('tableau de bord', () => {
 
   it('signale ce qui bloque', () => {
     const kinds = new Set(computeAlerts(studies, TODAY).map((a) => a.kind));
-    expect(kinds).toEqual(new Set(['overdue', 'due-soon', 'critical-risk', 'missing-dce', 'ready', 'relance', 'question']));
+    expect(kinds).toEqual(new Set(['overdue', 'due-soon', 'critical-risk', 'missing-dce', 'relance', 'question']));
   });
 });
 

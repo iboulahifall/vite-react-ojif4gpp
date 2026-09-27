@@ -21,6 +21,7 @@ import { useToast } from '../components/ui/Toast';
 import { CATEGORY_LABELS, FindingCard } from '../components/analysis/FindingCard';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
 import { questionCode, riskCode } from '../domain/risks';
+import { isLocked } from '../domain/validation';
 
 export function AnalysePage() {
   const { id = '' } = useParams();
@@ -75,7 +76,7 @@ function AnalyseView({ study }: { study: Study }) {
   const [running, setRunning] = useState<string[] | null>(null);
   const [pendingDecision, setPendingDecision] = useState<{ finding: Finding; status: FindingStatus } | null>(null);
   const a = study.analysis;
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const decisions = study.analysisDecisions;
   const summary = useMemo(() => (a ? summarize(a, decisions) : null), [a, decisions]);
   const stale = a && a.dceSignature !== dceSignature(study.documents);

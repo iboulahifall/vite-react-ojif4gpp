@@ -19,6 +19,7 @@ import { GuideBanner, HelpBox } from '../components/ui/Help';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 export function ReviewPage() {
   const { id = '' } = useParams();
@@ -103,7 +104,7 @@ function ReviewView({ study }: { study: Study }) {
   const filter = (params.get('filtre') as Filter) || 'tous';
   const [running, setRunning] = useState<number | null>(null);
   const [pending, setPending] = useState<{ kind: 'justify' | 'unjustify'; c: ReviewCheck } | { kind: 'validation' } | null>(null);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const r = study.review;
   const j = study.reviewJustifications;
   const score = useMemo(() => (r ? scoreOf(r.checks, j) : null), [r, j]);

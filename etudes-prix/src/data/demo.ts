@@ -99,6 +99,7 @@ export function buildDemoStudies(owner: string, today = new Date()): Study[] {
       consultations: seed.withFiles ? buildDemoConsultations(`demo-${i + 1}`, owner, today) : [],
       chiffrage: emptyChiffrage(),
       reviewJustifications: {},
+      validationCount: 0,
       ...(seed.withFiles ? buildDemoFollowUp(`demo-${i + 1}`, owner, today) : { risks: [], questions: [] }),
       plan,
       indicators: { criticalRisks: seed.critical ?? 0, openQuestions: seed.questions ?? 0, pendingPrices: seed.pending ?? 0 },

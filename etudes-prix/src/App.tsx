@@ -25,6 +25,8 @@ import { QuestionsPage } from './pages/QuestionsPage';
 import { QuestionsIndexPage, RisksIndexPage } from './pages/FollowUpIndexPages';
 import { ReviewPage } from './pages/ReviewPage';
 import { ReviewIndexPage } from './pages/ReviewIndexPage';
+import { ValidationPage } from './pages/ValidationPage';
+import { ValidationIndexPage } from './pages/ValidationIndexPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -56,6 +58,8 @@ function Routed() {
         <Route path="questions" element={<QuestionsIndexPage />} />
         <Route path="etudes/:id/revue" element={<ReviewPage />} />
         <Route path="revue" element={<ReviewIndexPage />} />
+        <Route path="etudes/:id/validation" element={<ValidationPage />} />
+        <Route path="validation" element={<ValidationIndexPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

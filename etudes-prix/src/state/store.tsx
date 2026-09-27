@@ -24,6 +24,7 @@ import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
 import { progressForStatus, stageOf } from '../domain/workflow';
 import { runReview as computeReview, scoreOf, type ReviewRecord } from '../domain/review';
+import { snapshotOf, type ValidationRecord } from '../domain/validation';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   userName: 'Ibrahima',
@@ -106,6 +107,10 @@ interface StoreValue {
   runReview(studyId: string): ReviewRecord | null;
   /** Justifie un point « à vérifier » de la revue (motif obligatoire) ; `null` retire la justification. */
   justifyCheck(studyId: string, checkId: string, reason: string | null): void;
+  /** Validation finale (V1.9) : fige les chiffres et verrouille l'étude. */
+  validateStudy(studyId: string, data: Pick<ValidationRecord, 'approver' | 'comment' | 'checklist' | 'withReserves'>, reason: string): ValidationRecord | null;
+  /** Déverrouille une étude validée (motif obligatoire) pour la modifier. */
+  unlockStudy(studyId: string, reason: string): void;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -132,7 +137,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       setSuppliers(storedSuppliers ?? buildDemoSuppliers());
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage(), risks: st.risks ?? [], questions: st.questions ?? [], reviewJustifications: st.reviewJustifications ?? {} })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage(), risks: st.risks ?? [], questions: st.questions ?? [], reviewJustifications: st.reviewJustifications ?? {}, validationCount: st.validationCount ?? 0 })));
       loaded.current = true;
       setReady(true);
     })();
@@ -584,6 +589,23 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
         else j[checkId] = { reason, by: settings.userName, at: new Date().toISOString(), detail: c.detail };
         updateStudy(studyId, { reviewJustifications: j }, [{ field: `Contrôle « ${c.label} »`, oldValue: reason === null ? 'Justifié' : 'À vérifier', newValue: reason === null ? 'À vérifier' : 'Justifié' }],
           reason ?? 'Justification retirée');
+      },
+      validateStudy(studyId, data, reason) {
+        const s = getStudy(studyId);
+        if (!s || s.validation || s.status === 'remise') return null;
+        const rec: ValidationRecord = { ...data, version: (s.validationCount ?? 0) + 1, validatedAt: new Date().toISOString(), validatedBy: settings.userName, snapshot: snapshotOf(s) };
+        const price = rec.snapshot.salePrice || rec.snapshot.amount;
+        const changes: TrackedChange[] = [{ field: 'Validation de l’étude', oldValue: 'Non validée',
+          newValue: `Validée V${rec.version}${rec.withReserves ? ' avec réserves' : ''} — ${formatEuro(price)} HT${data.approver ? `, prix validé par ${data.approver}` : ''}` }];
+        if (s.status !== 'validation') changes.push({ field: 'Étape', oldValue: stageOf(s.status).label, newValue: stageOf('validation').label });
+        updateStudy(studyId, { validation: rec, validationCount: rec.version, status: 'validation', progress: 99 }, changes, reason || 'Validation finale');
+        return rec;
+      },
+      unlockStudy(studyId, reason) {
+        const s = getStudy(studyId);
+        if (!s?.validation || s.status === 'remise') return;
+        updateStudy(studyId, { validation: undefined, progress: progressForStatus('validation', 90) },
+          [{ field: 'Validation de l’étude', oldValue: `Validée V${s.validation.version}`, newValue: 'Déverrouillée — à revalider' }], reason);
       },
       async initMetre(studyId) {
         const s = getStudy(studyId);

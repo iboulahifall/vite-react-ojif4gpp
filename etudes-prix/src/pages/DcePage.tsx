@@ -26,6 +26,7 @@ import { DceStatusBadge } from '../components/dce/DceStatusBadge';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
 import { docFacts } from '../domain/analysis/summary';
 import { downloadBlob } from '../lib/download';
+import { isLocked } from '../domain/validation';
 
 export function DcePage() {
   const { id = '' } = useParams();
@@ -49,7 +50,7 @@ function DceView({ study }: { study: Study }) {
   const { addDocuments, updateDocument, removeDocument, getFileBlob } = useStore();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const status = useMemo(() => dceStatus(study), [study]);
   const completeness = useMemo(() => dceCompleteness(study), [study]);
   const selectedId = params.get('doc') ?? study.documents[0]?.id ?? null;

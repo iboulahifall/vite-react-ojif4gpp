@@ -22,6 +22,7 @@ import { MetreTable } from '../components/metre/MetreTable';
 import { MetreLineModal } from '../components/metre/MetreLineModal';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
 import { downloadBlob } from '../lib/download';
+import { isLocked } from '../domain/validation';
 
 export function MetrePage() {
   const { id = '' } = useParams();
@@ -66,7 +67,7 @@ function MetreView({ study }: { study: Study }) {
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const lines = study.metre;
   const summary = useMemo(() => metreSummary(lines), [lines]);
   const hasDpgf = study.documents.some((d) => d.category === 'DPGF' && d.kind === 'excel');

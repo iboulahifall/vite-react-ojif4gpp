@@ -23,7 +23,8 @@ export interface Blocker {
  * rassemblé depuis tous les modules de l'étude, du plus grave au moins grave.
  */
 export function studyBlockers(s: Study, today = new Date()): Blocker[] {
-  if (s.status === 'remise') return [];
+  // Étude remise ou validée : la décision est prise, plus rien ne « bloque ».
+  if (s.status === 'remise' || s.validation) return [];
   const out: Blocker[] = [];
   const base = `/etudes/${s.id}`;
   const days = daysUntil(s.dueDate, today);

@@ -18,6 +18,7 @@ import { useToast } from '../components/ui/Toast';
 import { KpiCard } from '../components/KpiCard';
 import { RiskFormModal } from '../components/followup/RiskFormModal';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 export function RisksPage() {
   const { id = '' } = useParams();
@@ -37,7 +38,7 @@ const STATUS_CLS: Record<RiskStatus, string> = {
 };
 
 function RiskCard({ study, r, onEdit, onStatus, onDelete }: { study: Study; r: Risk; onEdit: () => void; onStatus: (s: RiskStatus) => void; onDelete: () => void }) {
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   return (
     <article className={clsx('rounded-xl border border-slate-200 bg-white p-4 shadow-sm', !isRiskActive(r) && 'opacity-70')}>
       <div className="flex items-start gap-2">
@@ -76,7 +77,7 @@ function RisksView({ study }: { study: Study }) {
   const [editing, setEditing] = useState<Risk | 'new' | null>(null);
   const [pending, setPending] = useState<{ kind: 'status'; r: Risk; status: RiskStatus } | { kind: 'delete'; r: Risk } | null>(null);
   const [showClosed, setShowClosed] = useState(false);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const sum = riskSummary(study.risks);
   const provision = study.chiffrage.lines.length ? buildUp(study.metre, study.chiffrage).risk : null;
   const suggestions = useMemo(() => (study.analysis?.findings ?? []).filter((f) =>

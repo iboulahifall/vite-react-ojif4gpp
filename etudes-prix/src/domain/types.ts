@@ -45,6 +45,7 @@ import type { Consultation } from './consultations';
 import type { Chiffrage } from './chiffrage';
 import type { Question, Risk } from './risks';
 import type { ReviewJustification, ReviewRecord } from './review';
+import type { ValidationRecord } from './validation';
 
 export interface DceDocDeclaration {
   type: DceDocType;
@@ -116,6 +117,10 @@ export interface Study {
   /** Dernière revue de prix (V1.8) et justifications des points « à vérifier ». */
   review?: ReviewRecord;
   reviewJustifications: Record<string, ReviewJustification>;
+  /** Validation finale (V1.9) : présente = étude verrouillée. */
+  validation?: ValidationRecord;
+  /** Nombre de validations prononcées (numéro de version de l'offre). */
+  validationCount: number;
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -128,7 +133,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage' | 'risks' | 'questions' | 'review' | 'reviewJustifications'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage' | 'risks' | 'questions' | 'review' | 'reviewJustifications' | 'validation' | 'validationCount'
 >;
 
 export interface AppSettings {

@@ -10,6 +10,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Field, SelectInput, TextArea, TextInput } from '../ui/Field';
 import { SourceBadge } from './SourceBadge';
+import { isLocked } from '../../domain/validation';
 
 function parse(s: string): number | null {
   const t = s.replace(/\s/g, '').replace(',', '.');
@@ -29,7 +30,7 @@ export function PriceLineModal({ study, line, price, history, onClose, onSave }:
   onSave: (patch: Omit<PriceLine, 'metreLineId'>) => void;
 }) {
   const { suppliers } = useStore();
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const [mat, setMat] = useState(show(price?.materialUnit));
   const [hours, setHours] = useState(show(price?.laborHoursUnit));
   const [sub, setSub] = useState(show(price?.subcontractUnit));

@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.8
+# Études de Prix CFO/CFA — V1.9
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -139,7 +139,20 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
   ce n’est **pas une garantie de conformité**. Revue **périmée** signalée dès que l’étude change ; passage à la
   validation impossible tant qu’un contrôle est bloquant. Rapport de revue imprimable.
 
-Les modules Validation et Rapports sont visibles dans le menu avec leur version prévue (V1.9 et V1.10).
+## Contenu de la V1.9 — Validation
+
+- **Récapitulatif avant remise** : projet, déboursé sec, prix de revient, prix de vente, marge, risques critiques,
+  questions ouvertes, prix fournisseurs manquants, lignes sans prix, résultat de la revue.
+- **⚠️ Validation humaine** : six cases à cocher, nom de la personne de la direction ayant validé le prix, commentaire.
+  Une revue de prix **à jour** est exigée ; s’il reste des contrôles bloquants, la validation n’est possible
+  qu’« **avec réserves** » (case dédiée + motif obligatoire).
+- **✅ Valider l’étude** : les chiffres sont figés, l’étude est **verrouillée** (bandeau sur toutes ses pages, métré, prix,
+  offres, risques et questions en lecture seule). **Déverrouillage** tracé avec motif, puis nouvelle validation
+  (versions V1, V2…). **Marquer l’offre comme remise** termine l’étude ; la remise passe obligatoirement par la validation.
+- Page **Validation** du menu : quelle étude est **prête à valider** (revue à jour sans blocage), laquelle est validée.
+  Fiche de validation imprimable avec cadres de signature.
+
+Le module Rapports est visible dans le menu avec sa version prévue (V1.10).
 
 ## Architecture
 

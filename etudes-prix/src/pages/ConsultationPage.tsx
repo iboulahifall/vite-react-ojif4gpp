@@ -23,6 +23,7 @@ import { RequestStatusBadge } from '../components/consultations/RequestStatusBad
 import { useRequestActions } from '../components/consultations/useRequestActions';
 import { downloadBlob } from '../lib/download';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { isLocked } from '../domain/validation';
 
 export function ConsultationPage() {
   const { id = '', cid = '' } = useParams();
@@ -49,7 +50,7 @@ function ConsultationView({ study, c }: { study: Study; c: Consultation }) {
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const locked = study.status === 'remise';
+  const locked = isLocked(study);
   const cmp = useMemo(() => compareOffers(c, study.metre), [c, study.metre]);
   const state = consultationState(c);
   const lines = c.metreLineIds.map((id) => study.metre.find((m) => m.id === id)).filter((m) => !!m);

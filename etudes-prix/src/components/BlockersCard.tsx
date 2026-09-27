@@ -12,7 +12,10 @@ export function BlockersCard({ study }: { study: Study }) {
     <Card>
       <CardHeader icon={<OctagonAlert size={18} className={blockers.length ? 'text-red-600' : 'text-emerald-600'} />} title="Ce qui bloque"
         subtitle={blockers.length ? `${blockers.filter((b) => b.level === 'critique').length} critique(s) · ${blockers.filter((b) => b.level === 'important').length} important(s)` : undefined} />
-      {blockers.length === 0 ? (
+      {study.validation && study.status !== 'remise' ? (
+        <p className="flex items-start gap-2 px-5 py-4 text-sm text-emerald-800"><CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+          <span>Étude validée V{study.validation.version} : la décision est prise.{study.validation.withReserves && <> Validée <strong>avec réserves</strong> ({study.validation.snapshot.reviewBlocking} contrôle(s) bloquant(s) accepté(s)).</>}</span></p>
+      ) : blockers.length === 0 ? (
         <p className="flex items-center gap-2 px-5 py-4 text-sm text-emerald-800"><CheckCircle2 size={16} /> Aucun blocage identifié.</p>
       ) : (
         <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">

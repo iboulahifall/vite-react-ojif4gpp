@@ -58,6 +58,7 @@ export function createStudyFromDraft(draft: StudyDraft, user: string, now = new 
     risks: [],
     questions: [],
     reviewJustifications: {},
+    validationCount: 0,
     status: 'analyse',
     progress: 5,
     isDemo: false,
