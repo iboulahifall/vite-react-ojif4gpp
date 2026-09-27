@@ -28,6 +28,15 @@ body {
 /* ---------- Impression ---------- */
 .print-only { display: none; }
 
+/* Rapport : aperçu « feuille A4 » à l'écran, mise en page normale à l'impression. */
+.report-first > section { break-before: auto !important; page-break-before: auto !important; }
+@media screen {
+  .report-sheet { width: 210mm; max-width: 100%; margin: 0 auto; padding: 14mm; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.06); border-radius: 4px; }
+  .report-sheet .print-break-before { border-top: 2px dashed #cbd5e1; margin-top: 10mm; padding-top: 10mm; }
+  .report-sheet .report-first > section { border-top: 0; margin-top: 0; padding-top: 0; }
+  .report-cover { min-height: 230mm; }
+}
+
 @page {
   size: A4;
   margin: 18mm 14mm 20mm 14mm;
@@ -40,6 +49,7 @@ body {
   .print-only { display: block !important; }
   .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
   .print-break-before { break-before: page; page-break-before: always; }
+  .report-cover { height: 250mm; }
   table { page-break-inside: auto; }
   tr { break-inside: avoid; page-break-inside: avoid; }
   thead { display: table-header-group; }

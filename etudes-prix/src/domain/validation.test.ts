@@ -58,3 +58,17 @@ describe('validation finale', () => {
     expect(computeAlerts([validated(s)], TODAY).some((a) => a.kind === 'ready')).toBe(false);
   });
 });
+
+import { studiesToCsv } from './exports';
+describe('export CSV des études', () => {
+  it('produit un CSV lisible par Excel (BOM, « ; », virgule décimale, champs protégés)', () => {
+    const studies = buildDemoStudies('T', TODAY);
+    const csv = studiesToCsv(studies, TODAY);
+    const lines = csv.split('\r\n');
+    expect(csv.startsWith('﻿')).toBe(true);
+    expect(lines).toHaveLength(studies.length + 1);
+    expect(lines[0].split(';')).toContain('Prochaine action');
+    const s = { ...studies[0], name: 'Lot « A » ; bâtiment "B"' };
+    expect(studiesToCsv([s], TODAY).split('\r\n')[1]).toContain('"Lot « A » ; bâtiment ""B"""');
+  });
+});

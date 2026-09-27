@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { AlertTriangle, BarChart3, Calculator, Factory, FileText, HelpCircle, Ruler, SearchCheck, BadgeCheck } from 'lucide-react';
+import { AlertTriangle, BarChart3, Calculator, Factory, FileText, HelpCircle, Ruler, SearchCheck, BadgeCheck, Printer } from 'lucide-react';
 import type { Study } from '../domain/types';
 import { dceCompleteness } from '../domain/documents';
 import { summarize } from '../domain/analysis/summary';
@@ -32,9 +32,10 @@ export function StudyModulesNav({ study }: { study: Study }) {
     { to: 'questions', label: 'Questions', Icon: HelpCircle, state: study.questions.length ? `${q.open} ouverte(s)` : 'aucune', warn: q.late > 0 },
     { to: 'revue', label: 'Revue', Icon: SearchCheck, state: rv ? (rvStale ? `${rv.score} % · à relancer` : `${rv.score} % · ${rv.blocking} bloquant(s)`) : 'à lancer', warn: !!rv && (rv.blocking > 0 || rvStale) },
     { to: 'validation', label: 'Validation', Icon: BadgeCheck, state: study.validation ? `🔒 validée V${study.validation.version}` : study.status === 'remise' ? 'remise' : 'à valider', warn: false },
+    { to: 'rapport', label: 'Rapport', Icon: Printer, state: study.validation ? 'dossier final' : 'projet', warn: false },
   ];
   return (
-    <nav aria-label="Modules de l’étude" className="no-print grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9">
+    <nav aria-label="Modules de l’étude" className="no-print grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {items.map(({ to, label, Icon, state, warn }) => (
         <NavLink key={to} to={`/etudes/${study.id}/${to}`}
           className="group flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-brand-300 hover:shadow-md">

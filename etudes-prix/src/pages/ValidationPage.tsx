@@ -79,7 +79,7 @@ function ValidationView({ study }: { study: Study }) {
           : <>Relisez le <strong>récapitulatif</strong>, cochez chaque point de contrôle, indiquez qui a validé le prix, puis cliquez sur <strong>Valider l’étude</strong>. L’étude sera verrouillée.</>}
       </GuideBanner>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[1fr_1.1fr]">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <Card>
           <CardHeader title="Récapitulatif de l’étude" subtitle={v ? `Chiffres figés à la validation ${versionLabel(study)} du ${formatDateTime(v.validatedAt)}` : 'Chiffres actuels de l’étude'} />
           <dl className="divide-y divide-slate-100 text-sm">

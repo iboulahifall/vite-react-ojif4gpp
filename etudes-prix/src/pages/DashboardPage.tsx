@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlarmClock, AlertOctagon, BarChart3, CheckCircle2, Euro, Flame, FolderOpen, Hourglass, ListChecks, Plus, Printer } from 'lucide-react';
+import { AlarmClock, AlertOctagon, BarChart3, CheckCircle2, Euro, Flame, FolderOpen, Hourglass, ListChecks, Plus, Printer, MonitorPlay } from 'lucide-react';
 import { useStore } from '../state/store';
 import { amountOf, computeAlerts, computeKpis, countByStatus, sortByPriority } from '../domain/kpi';
 import { formatEuro, formatEuroCompact } from '../domain/format';
@@ -42,6 +42,7 @@ export function DashboardPage() {
         subtitle={<span className="inline-block first-letter:uppercase">{today}</span>}
         actions={
           <>
+            <Button variant="secondary" icon={<MonitorPlay size={16} />} onClick={() => navigate('/presentation')}>📺 Mode présentation</Button>
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer</Button>
             <Button size="lg" icon={<Plus size={18} />} onClick={() => navigate('/nouvelle-etude')}>Nouvelle étude</Button>
           </>

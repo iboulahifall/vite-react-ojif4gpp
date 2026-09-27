@@ -199,7 +199,7 @@ function ReviewView({ study }: { study: Study }) {
             </div>
           )}
 
-          <div className="no-print grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
+          <div className="no-print grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
             <Card className="flex flex-col items-center justify-center p-6 text-center">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Score de contrôle</span>
               <span className={clsx('mt-2 rounded-2xl px-6 py-2 text-5xl font-extrabold tabular ring-1 ring-inset', toneCls)} data-testid="review-score">{score.score} %</span>

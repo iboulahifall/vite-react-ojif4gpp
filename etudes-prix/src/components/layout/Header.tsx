@@ -153,7 +153,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <li>Le <strong>mode guidé</strong> affiche des explications sur chaque écran ; le <strong>mode expert</strong> les masque.</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Version 1.7 : tableau de bord, création d’étude, DCE, analyse CCTP / DPGF, métré, consultations fournisseurs, chiffrage, risques et questions. Les modules revue de prix, validation et rapports arrivent dans les versions suivantes (voir la version indiquée dans le menu).</p>
+        <p className="text-xs text-slate-500">Version 1.10 : parcours complet — nouvelle étude, DCE, analyse CCTP / DPGF, métré, consultations fournisseurs, chiffrage, risques et questions, revue de prix, validation, rapport PDF, exports Excel / CSV et mode présentation.</p>
       </div>
     </Modal>
   );

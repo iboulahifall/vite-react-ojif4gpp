@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   AlertOctagon, ArrowRight, Calendar, FolderOpen, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
-  Pencil, Plus, Printer, SkipBack, Target, Trash2, User,
+  Pencil, Plus, Printer, SkipBack, Target, Trash2, User, MonitorPlay,
 } from 'lucide-react';
 import { useStore, type TrackedChange } from '../state/store';
 import type { Study, StudyIndicators, StudyStatus } from '../domain/types';
@@ -197,7 +197,9 @@ function StudyView({ study }: { study: Study }) {
         subtitle={<>{study.reference} · {MARKET_LABELS[study.marketType]} · {study.lots.map((l) => <Tag key={l} tone="brand">{l}</Tag>)}</>}
         actions={
           <>
+            <Button variant="secondary" icon={<MonitorPlay size={16} />} onClick={() => navigate(`/presentation/${study.id}`)} aria-label="Mode présentation" title="Mode présentation" />
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer</Button>
+            <Button variant="secondary" icon={<FileText size={16} />} onClick={() => navigate(`/etudes/${study.id}/rapport`)}>Rapport</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)} disabled={locked}>Modifier</Button>
             <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => setPending({ kind: 'delete' })} aria-label="Supprimer l’étude" title="Supprimer l’étude" className="text-red-700 hover:bg-red-50" />
           </>
@@ -233,7 +235,7 @@ function StudyView({ study }: { study: Study }) {
           : <>Une fois l’étape terminée, cliquez sur <strong>Étape suivante</strong>.{!stage.delivered && <> L’outil dédié à cette étape arrive en {stage.module}.</>}</>)}
       </GuideBanner>
 
-      <div className="no-print grid items-start gap-5 xl:grid-cols-3">
+      <div className="no-print grid grid-cols-1 items-start gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <div className="grid gap-5 p-5 sm:grid-cols-2 lg:grid-cols-4">
             <Info icon={<User size={16} />} label="Client">{study.client}</Info>

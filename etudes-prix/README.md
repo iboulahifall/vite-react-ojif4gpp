@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.9
+# Études de Prix CFO/CFA — V1.10
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -152,7 +152,22 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
 - Page **Validation** du menu : quelle étude est **prête à valider** (revue à jour sans blocage), laquelle est validée.
   Fiche de validation imprimable avec cadres de signature.
 
-Le module Rapports est visible dans le menu avec sa version prévue (V1.10).
+## Contenu de la V1.10 — Impression, PDF et exports
+
+- **Rapport complet** (page Rapport de chaque étude, ou menu **Rapports**) : page de garde (logo et nom de l’entreprise,
+  projet, client, référence, date, version, responsable), puis Synthèse, Périmètre, Analyse DCE, Métrés, Consultations,
+  Chiffrage, Risques, Questions, Contrôles, Validation — sections au choix, aperçu à l’écran.
+- **Synthèse réunion** : version courte (1 à 2 pages) — chiffres clés, état, ce qui bloque, risques, questions, prochaines tâches.
+- **A4** avec en-tête et pied de page répétés, numéro de page « Page x / n », date, référence affaire et version
+  (V1 projet, V1 validée…). **PDF** : bouton « Imprimer / PDF », puis « Enregistrer au format PDF » dans la fenêtre
+  d’impression (le navigateur produit un PDF texte, net et léger). Les sections sans données ne créent pas de page presque vide.
+- **Exports** : chiffrage détaillé **Excel**, métré **CSV**, liste des études affichée (filtres appliqués) **CSV** depuis *Mes études*.
+- **📺 Mode présentation** (tableau de bord, fiche étude, rapports) : une étude par écran en grand — projet, montant,
+  avancement, remise, risques, questions, prochaines actions ; flèches ← → pour passer d’une étude à l’autre, Échap pour quitter,
+  plein écran.
+- **Logo de l’entreprise** réglable dans *Paramètres* (PNG, JPG, SVG ≤ 300 Ko).
+
+Parcours complet disponible : **nouvelle étude → DCE → analyse → métré → consultations → chiffrage → revue → validation → PDF**.
 
 ## Architecture
 
@@ -163,7 +178,7 @@ src/
   state/       état applicatif React (historique des modifications)
   components/  interface (layout, composants UI, blocs étude)
   pages/       écrans
-  print/       mise en page d'impression A4
+  print/       mise en page d'impression A4 (documents par page, rapport complet et synthèse)
   lib/         lecture des fichiers (pdf.js, ExcelJS, mammoth), chargés à la demande
 ```
 

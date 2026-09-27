@@ -33,6 +33,25 @@ export function SettingsPage() {
           }}>
             <Field label="Votre nom"><TextInput value={userName} onChange={(e) => setUserName(e.target.value)} /></Field>
             <Field label="Entreprise" hint="Affichée en en-tête des documents imprimés."><TextInput value={companyName} onChange={(e) => setCompanyName(e.target.value)} /></Field>
+            <Field label="Logo de l’entreprise" hint="PNG, JPG ou SVG, 300 Ko maximum. Affiché sur la page de garde et l’en-tête des rapports.">
+              <div className="flex flex-wrap items-center gap-3">
+                {settings.logo ? <img src={settings.logo} alt="Logo actuel" className="h-12 max-w-[160px] rounded border border-slate-200 bg-white object-contain p-1" /> : <span className="text-sm text-slate-500">Aucun logo</span>}
+                <label className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                  {settings.logo ? 'Changer' : 'Choisir une image'}
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml" className="sr-only" data-testid="logo-input" onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!f) return;
+                    if (!/^image\/(png|jpeg|svg\+xml)$/.test(f.type)) { toast('Format non accepté : PNG, JPG ou SVG'); return; }
+                    if (f.size > 300 * 1024) { toast('Logo trop lourd (300 Ko maximum)'); return; }
+                    const r = new FileReader();
+                    r.onload = () => { updateSettings({ logo: String(r.result) }); toast('Logo enregistré'); };
+                    r.readAsDataURL(f);
+                  }} />
+                </label>
+                {settings.logo && <Button type="button" size="sm" variant="ghost" onClick={() => { updateSettings({ logo: undefined }); toast('Logo retiré'); }}>Retirer</Button>}
+              </div>
+            </Field>
             <Button type="submit">Enregistrer</Button>
           </form>
         </Card>

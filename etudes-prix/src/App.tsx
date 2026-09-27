@@ -27,6 +27,9 @@ import { ReviewPage } from './pages/ReviewPage';
 import { ReviewIndexPage } from './pages/ReviewIndexPage';
 import { ValidationPage } from './pages/ValidationPage';
 import { ValidationIndexPage } from './pages/ValidationIndexPage';
+import { ReportPage } from './pages/ReportPage';
+import { ReportsIndexPage } from './pages/ReportsIndexPage';
+import { PresentationPage } from './pages/PresentationPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -35,6 +38,8 @@ function Routed() {
   if (!ready) return <div className="flex h-full items-center justify-center text-slate-500">Chargement…</div>;
   return (
     <Routes>
+      <Route path="presentation" element={<PresentationPage />} />
+      <Route path="presentation/:id" element={<PresentationPage />} />
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="etudes" element={<StudiesPage />} />
@@ -60,6 +65,8 @@ function Routed() {
         <Route path="revue" element={<ReviewIndexPage />} />
         <Route path="etudes/:id/validation" element={<ValidationPage />} />
         <Route path="validation" element={<ValidationIndexPage />} />
+        <Route path="etudes/:id/rapport" element={<ReportPage />} />
+        <Route path="rapports" element={<ReportsIndexPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

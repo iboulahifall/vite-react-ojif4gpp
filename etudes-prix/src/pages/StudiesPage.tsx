@@ -1,7 +1,10 @@
 import { useMemo } from 'react';
+import { studiesToCsv } from '../domain/exports';
+import { downloadBlob } from '../lib/download';
+import { useToast } from '../components/ui/Toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, ArrowUpDown, FolderOpen, Plus, Printer, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, FolderOpen, Plus, Printer, Search, X, Table2 } from 'lucide-react';
 import { useStore } from '../state/store';
 import type { Study } from '../domain/types';
 import { STAGES, isActive, nextAction, stageIndex, stageOf, RISK_ORDER } from '../domain/workflow';
@@ -40,6 +43,7 @@ const COMPARE: Record<SortKey, (a: Study, b: Study) => number> = {
 export function StudiesPage() {
   const { studies } = useStore();
   const navigate = useNavigate();
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const statut = params.get('statut') ?? 'en-cours';
@@ -93,6 +97,10 @@ export function StudiesPage() {
         subtitle="Toutes vos études de prix. Recherchez, filtrez, triez, puis cliquez sur une étude pour l’ouvrir."
         actions={
           <>
+            <Button variant="secondary" icon={<Table2 size={16} />} disabled={!rows.length} onClick={() => {
+              downloadBlob(new Blob([studiesToCsv(rows)], { type: 'text/csv;charset=utf-8' }), `Etudes_${new Date().toISOString().slice(0, 10)}.csv`);
+              toast(`${rows.length} étude(s) exportée(s) (CSV)`);
+            }}>Exporter (CSV)</Button>
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer la liste</Button>
             <Button icon={<Plus size={18} />} onClick={() => navigate('/nouvelle-etude')}>Nouvelle étude</Button>
           </>

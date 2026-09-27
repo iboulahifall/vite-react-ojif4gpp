@@ -139,5 +139,7 @@ export type StudyDraft = Omit<
 export interface AppSettings {
   userName: string;
   companyName: string;
+  /** Logo de l'entreprise (image en data URL), affiché sur les rapports. */
+  logo?: string;
   guidedMode: boolean;
 }

@@ -35,7 +35,7 @@ export const STAGES: StageInfo[] = [
     todo: 'Contrôler la cohérence du chiffrage : quantités, prix, risques, oublis.' },
   { id: 'validation', label: 'Validation', short: 'Validation', minProgress: 90, module: 'V1.9', delivered: true,
     todo: 'Valider l’étude avec la direction et préparer le dossier de remise.' },
-  { id: 'remise', label: 'Remise', short: 'Remise', minProgress: 100, module: 'V1.10', delivered: false,
+  { id: 'remise', label: 'Remise', short: 'Remise', minProgress: 100, module: 'V1.10', delivered: true,
     todo: 'Offre remise au client. L’étude est terminée.' },
 ];
 

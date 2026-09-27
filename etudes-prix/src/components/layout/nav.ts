@@ -29,8 +29,7 @@ export const MODULE_NAV: NavItem[] = [
   { to: '/questions', label: 'Questions', icon: HelpCircle },
   { to: '/revue', label: 'Revue de prix', icon: SearchCheck },
   { to: '/validation', label: 'Validation', icon: BadgeCheck },
-  { to: '/modules/rapports', label: 'Rapports', icon: Printer, version: 'V1.10',
-    description: 'Générer le rapport PDF complet, la synthèse réunion et l’export Excel du chiffrage.' },
+  { to: '/rapports', label: 'Rapports', icon: Printer },
 ];
 
 export const SETTINGS_NAV: NavItem = { to: '/parametres', label: 'Paramètres', icon: Settings };
