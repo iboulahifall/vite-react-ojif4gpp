@@ -14,6 +14,21 @@ export interface StudyRepository {
   loadSuppliers(): Promise<Supplier[] | null>;
   saveSuppliers(suppliers: Supplier[]): Promise<void>;
   clear(): Promise<void>;
+  /** Où sont enregistrées les données (affiché dans l'application). */
+  readonly kind?: 'local' | 'server';
+  /** État de l'enregistrement (serveur) : pour afficher « enregistré », « hors ligne », « conflit ». */
+  subscribe?(listener: (s: SyncStatus) => void): () => void;
+}
+
+export type SyncState = 'saved' | 'saving' | 'offline' | 'conflict';
+export interface SyncStatus {
+  state: SyncState;
+  /** Modifications en attente d'envoi. */
+  pending: number;
+  /** Études refusées par le serveur car modifiées sur un autre poste. */
+  conflicts: string[];
+  lastSavedAt?: string;
+  database?: string;
 }
 
 const STUDIES_KEY = 'etudes-prix.v1.studies';
@@ -36,6 +51,7 @@ function memoryStore(): KeyValueStore {
 }
 
 export class LocalStudyRepository implements StudyRepository {
+  readonly kind = 'local' as const;
   private store: KeyValueStore;
 
   constructor(store?: KeyValueStore) {

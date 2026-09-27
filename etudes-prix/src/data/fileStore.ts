@@ -61,6 +61,11 @@ export class MemoryFileStore implements FileStore {
 
 let instance: FileStore | null = null;
 
+/** Remplace le stockage des fichiers (serveur). */
+export function setFileStore(store: FileStore): void {
+  instance = store;
+}
+
 export function getFileStore(): FileStore {
   if (!instance) {
     try {

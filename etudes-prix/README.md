@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.10
+# Études de Prix CFO/CFA — V2.0
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -11,6 +11,22 @@ npm run dev        # http://localhost:5173
 npm test           # tests unitaires (logique métier)
 npm run build      # vérification TypeScript + build de production
 ```
+
+### Avec le serveur (données partagées entre postes)
+
+```bash
+cd etudes-prix
+npm install && npm run build          # compile l'application web (dist/)
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
+# → ouvrir http://<adresse-du-serveur>:8000
+```
+
+Le serveur FastAPI sert l'application et l'API ; l'application le détecte toute seule et y enregistre
+tout (études, fournisseurs, paramètres, fichiers). Sans serveur, elle enregistre dans le navigateur.
+Développement : `uvicorn … --port 8000` dans un terminal et `npm run dev` dans un autre (`/api` est relayé).
+Tests du serveur : `pip install -r requirements-dev.txt && python -m pytest`.
 
 Au premier lancement, un portefeuille fictif est créé automatiquement
 (**PROJET DÉMONSTRATION — IMMEUBLE TERTIAIRE** + 13 études « Démo »).
@@ -169,6 +185,28 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
 
 Parcours complet disponible : **nouvelle étude → DCE → analyse → métré → consultations → chiffrage → revue → validation → PDF**.
 
+## Contenu de la V2.0 — Serveur (FastAPI + SQLite)
+
+- **Serveur FastAPI** (`backend/`) : API REST `/api/studies`, `/api/suppliers`, `/api/settings`, `/api/files/{id}`,
+  `/api/health`, et l'application web servie par le même serveur. Documentation interactive : `/docs`.
+- **Base SQLite** (`backend/data/etudes-prix.db`) avec SQLAlchemy 2 : passage à **PostgreSQL** par la seule variable
+  `DATABASE_URL=postgresql+psycopg://utilisateur:motdepasse@hote/base` (installer `psycopg[binary]`). Les études sont
+  stockées en documents JSON avec colonnes indexées (référence, étape, date de remise) ; les fichiers sont sur disque
+  (`FILES_DIR`), 50 Mo maximum (`MAX_UPLOAD_MB`).
+- **Aucune modification perdue entre postes** : chaque enregistrement porte un numéro de version ; si une étude a été
+  modifiée entre-temps sur un autre poste, le serveur refuse d'écraser (409) et l'application affiche un bandeau
+  « Modifié sur un autre poste — Recharger la dernière version ».
+- **Enregistrement automatique** : seules les études modifiées sont envoyées, regroupées toutes les ~0,4 s ; si le serveur
+  est injoignable, un bandeau l'indique, les modifications sont gardées et renvoyées automatiquement, et le navigateur
+  prévient avant de fermer la page. L'état (« Serveur (sqlite) — enregistré ») est affiché en bas du menu.
+- **Migration** : dans *Paramètres → Stockage des données*, « Envoyer vers le serveur » transfère les études et fichiers
+  saisis auparavant dans le navigateur (sans rien écraser côté serveur). `?stockage=navigateur` dans l'adresse force le
+  mode navigateur.
+- **Sauvegarde** : copier `backend/data/` (base + fichiers), serveur arrêté ; avec PostgreSQL, `pg_dump` + le dossier des fichiers.
+
+Variables : `DATABASE_URL`, `FILES_DIR`, `FRONTEND_DIST`, `MAX_UPLOAD_MB`, `CORS_ORIGINS` (valeurs par défaut adaptées à un poste).
+Il n'y a pas encore de comptes utilisateurs : à réserver au réseau interne de l'entreprise.
+
 ## Architecture
 
 ```
@@ -180,9 +218,11 @@ src/
   pages/       écrans
   print/       mise en page d'impression A4 (documents par page, rapport complet et synthèse)
   lib/         lecture des fichiers (pdf.js, ExcelJS, mammoth), chargés à la demande
+backend/
+  app/         FastAPI : configuration, base (SQLAlchemy), tables, API
+  tests/       tests de l'API (pytest)
 ```
 
-Les données sont enregistrées dans le navigateur : les études dans localStorage, le contenu
-des fichiers dans IndexedDB. Elles ne sont donc pas partagées entre postes. Les interfaces
-asynchrones `StudyRepository` et `FileStore` permettront de brancher le backend prévu
-(FastAPI + SQLite, puis PostgreSQL) sans modifier les écrans.
+Stockage : `StudyRepository` et `FileStore` ont deux implémentations — navigateur (localStorage + IndexedDB)
+et serveur (`HttpStudyRepository`, `HttpFileStore`) — choisies au démarrage (`src/data/backend.ts`) ; les écrans
+ne changent pas.

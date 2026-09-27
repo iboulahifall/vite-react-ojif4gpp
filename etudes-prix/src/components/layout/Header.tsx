@@ -153,7 +153,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <li>Le <strong>mode guidé</strong> affiche des explications sur chaque écran ; le <strong>mode expert</strong> les masque.</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Version 1.10 : parcours complet — nouvelle étude, DCE, analyse CCTP / DPGF, métré, consultations fournisseurs, chiffrage, risques et questions, revue de prix, validation, rapport PDF, exports Excel / CSV et mode présentation.</p>
+        <p className="text-xs text-slate-500">Version 2.0 : parcours complet — nouvelle étude, DCE, analyse CCTP / DPGF, métré, consultations fournisseurs, chiffrage, risques et questions, revue de prix, validation, rapport PDF, exports Excel / CSV et mode présentation. Données sur le serveur de l’application (partagées entre postes) ou dans ce navigateur.</p>
       </div>
     </Modal>
   );

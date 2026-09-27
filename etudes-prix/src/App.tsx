@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { HashRouter, Route, Routes } from 'react-router-dom';
+import type { StudyRepository } from './data/repository';
+import { chooseRepository } from './data/backend';
 import { StoreProvider, useStore } from './state/store';
 import { ToastProvider } from './components/ui/Toast';
 import { AppLayout } from './components/layout/AppLayout';
@@ -34,7 +37,20 @@ import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 function Routed() {
-  const { ready } = useStore();
+  const { ready, loadError } = useStore();
+  if (loadError) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-lg font-semibold text-slate-900">Impossible de charger les données du serveur</p>
+          <p className="mt-2 text-sm text-slate-600">{loadError}</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <button onClick={() => window.location.reload()} className="cursor-pointer rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white hover:bg-brand-800">Réessayer</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!ready) return <div className="flex h-full items-center justify-center text-slate-500">Chargement…</div>;
   return (
     <Routes>
@@ -77,8 +93,12 @@ function Routed() {
 }
 
 export function App() {
+  // Stockage : le serveur s'il répond, sinon ce navigateur.
+  const [repo, setRepo] = useState<StudyRepository | null>(null);
+  useEffect(() => { void chooseRepository().then(setRepo); }, []);
+  if (!repo) return <div className="flex h-full items-center justify-center text-slate-500">Chargement…</div>;
   return (
-    <StoreProvider>
+    <StoreProvider repository={repo}>
       <ToastProvider>
         <HashRouter>
           <Routed />

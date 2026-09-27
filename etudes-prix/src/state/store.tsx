@@ -19,7 +19,7 @@ import { buildUp, emptyChiffrage, lineCost, type PriceLine, type PricingParams }
 import { baseLineFor, importRetainedOffers, type OfferImport } from '../domain/priceBase';
 import { nextNumber, questionCode, QUESTION_STATUS_LABELS, riskCode, RISK_STATUS_LABELS, type Question, type QuestionStatus, type Risk } from '../domain/risks';
 import { sourceLabel } from '../domain/analysis/analyse';
-import { LocalStudyRepository, type StudyRepository } from '../data/repository';
+import { LocalStudyRepository, type StudyRepository, type SyncStatus } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
 import { progressForStatus, stageOf } from '../domain/workflow';
@@ -45,6 +45,10 @@ export type MetreLinePatch = Partial<Pick<MetreLine, 'calcQty' | 'calcDetail' | 
 
 interface StoreValue {
   ready: boolean;
+  /** Échec du chargement des données (serveur injoignable au démarrage). */
+  loadError: string | null;
+  /** Où sont enregistrées les données, et état de l'enregistrement sur le serveur. */
+  storage: { kind: 'local' | 'server'; status: SyncStatus | null };
   studies: Study[];
   settings: AppSettings;
   hasDemo: boolean;
@@ -119,20 +123,39 @@ interface StoreValue {
 const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children, repository }: { children: ReactNode; repository?: StudyRepository }) {
-  const repo = useMemo(() => repository ?? new LocalStudyRepository(), [repository]);
+  const repo = useMemo<StudyRepository>(() => repository ?? new LocalStudyRepository(), [repository]);
   const [ready, setReady] = useState(false);
   const [studies, setStudies] = useState<Study[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const loaded = useRef(false);
+  const [sync, setSync] = useState<SyncStatus | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => repo.subscribe?.(setSync), [repo]);
+
+  // Serveur : prévenir avant de fermer la page si des modifications ne sont pas encore enregistrées.
+  useEffect(() => {
+    const pending = (repo as { hasPendingChanges?: () => boolean }).hasPendingChanges;
+    if (!pending) return;
+    const onUnload = (e: BeforeUnloadEvent) => { if (pending.call(repo)) e.preventDefault(); };
+    window.addEventListener('beforeunload', onUnload);
+    return () => window.removeEventListener('beforeunload', onUnload);
+  }, [repo]);
 
   // Premier lancement : création automatique du projet de démonstration.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const s = { ...DEFAULT_SETTINGS, ...((await repo.loadSettings()) ?? {}) };
-      const stored = await repo.loadStudies();
-      const storedSuppliers = await repo.loadSuppliers();
+      let s: AppSettings, stored: Study[] | null, storedSuppliers: Supplier[] | null;
+      try {
+        s = { ...DEFAULT_SETTINGS, ...((await repo.loadSettings()) ?? {}) };
+        stored = await repo.loadStudies();
+        storedSuppliers = await repo.loadSuppliers();
+      } catch (e) {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));
+        return;
+      }
       if (cancelled) return;
       setSuppliers(storedSuppliers ?? buildDemoSuppliers());
       setSettings(s);
@@ -227,6 +250,8 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     };
     return {
       ready,
+      loadError,
+      storage: { kind: repo.kind ?? 'local', status: sync },
       studies,
       settings,
       hasDemo: studies.some((s) => s.isDemo),
@@ -745,7 +770,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
         setStudies((prev) => prev.filter((s) => !s.isDemo));
       },
     };
-  }, [ready, studies, settings, suppliers, updateStudy, entry, patchDocuments, getFileBlob]);
+  }, [ready, loadError, repo, sync, studies, settings, suppliers, updateStudy, entry, patchDocuments, getFileBlob]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

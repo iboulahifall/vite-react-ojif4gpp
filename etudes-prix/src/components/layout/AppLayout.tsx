@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useStore } from '../../state/store';
 import { LockBanner } from '../LockBanner';
+import { SyncBanner } from '../SyncIndicator';
 
 export function AppLayout() {
   const [drawer, setDrawer] = useState(false);
@@ -27,6 +28,7 @@ export function AppLayout() {
         </div>
       )}
       <Header onMenu={() => setDrawer(true)} />
+      <SyncBanner />
       {hasDemo && (
         <div className="no-print flex items-center justify-center gap-2 bg-fuchsia-50 px-4 py-1.5 text-center text-xs font-medium text-fuchsia-900 border-b border-fuchsia-100">
           <FlaskConical size={14} aria-hidden />

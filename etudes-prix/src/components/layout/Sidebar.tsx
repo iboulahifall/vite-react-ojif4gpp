@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { NavLink } from 'react-router-dom';
 import { Zap } from 'lucide-react';
+import { SyncIndicator } from '../SyncIndicator';
 import { MAIN_NAV, MODULE_NAV, SETTINGS_NAV, type NavItem } from './nav';
 
 function Item({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
@@ -56,7 +57,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="border-t border-white/10 px-3 py-3">
         <Item item={SETTINGS_NAV} onNavigate={onNavigate} />
-        <p className="mt-2 px-3 text-[11px] text-slate-500">Version 1.10</p>
+        <p className="mt-2 px-3 text-[11px] text-slate-500">Version 2.0</p>
+        <SyncIndicator />
       </div>
     </div>
   );

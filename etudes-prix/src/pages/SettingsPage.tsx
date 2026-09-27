@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Compass, FlaskConical, Settings, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { migrateLocalToServer, readLocalData } from '../data/migrateToServer';
+import { Compass, Database, FlaskConical, HardDrive, Settings, Upload, Zap } from 'lucide-react';
 import clsx from 'clsx';
 import { useStore } from '../state/store';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -11,7 +12,12 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 
 export function SettingsPage() {
-  const { settings, updateSettings, studies, resetDemo, removeDemo } = useStore();
+  const { settings, updateSettings, studies, resetDemo, removeDemo, storage } = useStore();
+  const [localCount, setLocalCount] = useState(0);
+  const [migrating, setMigrating] = useState(false);
+  useEffect(() => {
+    if (storage.kind === 'server') void readLocalData().then((d) => setLocalCount(d.studies.filter((x) => !studies.some((y) => y.id === x.id)).length));
+  }, [storage.kind, studies]);
   const toast = useToast();
   const [userName, setUserName] = useState(settings.userName);
   const [companyName, setCompanyName] = useState(settings.companyName);
@@ -74,11 +80,38 @@ export function SettingsPage() {
         </Card>
 
         <Card className="lg:col-span-2">
+          <CardHeader icon={storage.kind === 'server' ? <Database size={18} /> : <HardDrive size={18} />} title="Stockage des données"
+            subtitle={storage.kind === 'server' ? `Serveur de l’application — base ${storage.status?.database ?? ''}` : 'Ce navigateur uniquement'} />
+          <div className="space-y-3 p-5 text-sm text-slate-700">
+            {storage.kind === 'server' ? (
+              <>
+                <p>Les études, fournisseurs, paramètres et fichiers sont enregistrés sur le <strong>serveur</strong> : ils sont partagés entre les postes et sauvegardables avec la base. Si une étude est modifiée en même temps sur deux postes, la seconde modification est refusée (rien n’est écrasé) et un bandeau propose de recharger.</p>
+                {localCount > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-3 py-2 ring-1 ring-inset ring-amber-200">
+                    <span className="flex-1 text-amber-900">Ce navigateur contient encore <strong>{localCount} étude(s)</strong> saisie(s) avant le passage au serveur.</span>
+                    <Button size="sm" icon={<Upload size={14} />} disabled={migrating} onClick={async () => {
+                      setMigrating(true);
+                      try {
+                        const r = await migrateLocalToServer();
+                        toast(`${r.studies} étude(s), ${r.suppliers} fournisseur(s) et ${r.files} fichier(s) envoyés au serveur`);
+                        setTimeout(() => window.location.reload(), 1200);
+                      } catch { toast('Envoi impossible : serveur injoignable'); setMigrating(false); }
+                    }}>Envoyer vers le serveur</Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p>Les données sont enregistrées <strong>dans ce navigateur</strong> (non partagées entre postes). Pour les partager, lancez le serveur de l’application (voir le fichier README) et ouvrez l’application depuis son adresse : elle l’utilisera automatiquement.</p>
+            )}
+          </div>
+        </Card>
+
+        <Card className="lg:col-span-2">
           <CardHeader icon={<FlaskConical size={18} />} title="Données de démonstration" subtitle={`${demoCount} étude(s) fictive(s) actuellement chargée(s)`} />
           <div className="flex flex-wrap gap-2 p-5">
             <Button variant="secondary" onClick={() => setConfirm('reset')}>Réinitialiser les données de démonstration</Button>
             <Button variant="secondary" className="text-red-700" disabled={!demoCount} onClick={() => setConfirm('remove')}>Supprimer les données de démonstration</Button>
-            <p className="w-full text-xs text-slate-500">Vos propres études ne sont jamais modifiées par ces actions. Les données sont enregistrées dans ce navigateur.</p>
+            <p className="w-full text-xs text-slate-500">Vos propres études ne sont jamais modifiées par ces actions.</p>
           </div>
         </Card>
       </div>
