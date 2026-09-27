@@ -51,6 +51,14 @@ describe('workflow', () => {
     expect(nextAction(study({ status: 'remise' }), TODAY).label).toBe('Aucune');
   });
 
+  it('aux consultations : lancer, puis relancer les fournisseurs en retard', () => {
+    expect(nextAction(study({ dueDate: '2026-10-20', status: 'consultation' }), TODAY).label).toBe('Lancer les consultations');
+    const demo = buildDemoStudies('T', TODAY)[0];
+    const a = nextAction({ ...demo, status: 'consultation' }, TODAY);
+    expect(a.label).toBe('Relancer');
+    expect(a.reason).toMatch(/sans réponse/);
+  });
+
   it('au métré : créer, puis valider les quantités', () => {
     const base = study({ dueDate: '2026-10-20', status: 'metre' });
     expect(nextAction(base, TODAY).label).toBe('Créer le métré');
@@ -132,7 +140,7 @@ describe('tableau de bord', () => {
 
   it('signale ce qui bloque', () => {
     const kinds = new Set(computeAlerts(studies, TODAY).map((a) => a.kind));
-    expect(kinds).toEqual(new Set(['overdue', 'due-soon', 'critical-risk', 'missing-dce', 'ready']));
+    expect(kinds).toEqual(new Set(['overdue', 'due-soon', 'critical-risk', 'missing-dce', 'ready', 'relance']));
   });
 });
 

@@ -11,6 +11,10 @@ import { analyse, dceSignature } from '../domain/analysis/analyse';
 import { parseDpgf } from '../domain/analysis/dpgf';
 import { effectiveQty, formatQty, mergeDpgf, type MergeResult, type MetreLine } from '../domain/metre';
 import { FAMILIES } from '../domain/catalog';
+import { STATUS_LABELS, offerTotal, type Consultation, type Offer, type OfferFile, type Supplier, type SupplierRequest } from '../domain/consultations';
+import { buildDemoSuppliers } from '../data/demoConsultations';
+import { formatEuro } from '../domain/format';
+import { toISODate } from '../domain/dates';
 import { LocalStudyRepository, type StudyRepository } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
@@ -40,7 +44,8 @@ interface StoreValue {
   hasDemo: boolean;
   getStudy(id: string): Study | undefined;
   createStudy(draft: StudyDraft): Study;
-  updateStudy(id: string, patch: Partial<Study>, changes: TrackedChange[], reason: string): void;
+  /** `patch` peut être une fonction de l'étude à jour (modifications successives rapides). */
+  updateStudy(id: string, patch: Partial<Study> | ((s: Study) => Partial<Study>), changes: TrackedChange[], reason: string): void;
   setStatus(id: string, status: StudyStatus, reason: string): void;
   setProgress(id: string, progress: number, reason: string): void;
   deleteStudy(id: string): void;
@@ -59,6 +64,22 @@ interface StoreValue {
   addMetreLine(studyId: string, line: Pick<MetreLine, 'familyId' | 'ref' | 'designation' | 'unit'> & Partial<MetreLine>): MetreLine;
   removeMetreLine(studyId: string, lineId: string, reason: string): void;
   setMetreValidation(studyId: string, lineIds: string[], validated: boolean, reason: string): void;
+  /** Annuaire des fournisseurs et sous-traitants (commun aux études). */
+  suppliers: Supplier[];
+  saveSupplier(supplier: Omit<Supplier, 'id'> & { id?: string }): Supplier;
+  deleteSupplier(id: string): void;
+  createConsultation(studyId: string, data: Omit<Consultation, 'id' | 'createdAt' | 'requests'> & { supplierIds: string[]; sendNow?: boolean }): Consultation;
+  updateConsultation(studyId: string, cid: string, patch: Partial<Pick<Consultation, 'label' | 'kind' | 'familyIds' | 'metreLineIds' | 'dueDate' | 'notes'>>, reason: string): void;
+  deleteConsultation(studyId: string, cid: string, reason: string): void;
+  addRequests(studyId: string, cid: string, supplierIds: string[]): void;
+  removeRequest(studyId: string, cid: string, rid: string, reason: string): void;
+  markSent(studyId: string, cid: string, rids: string[]): void;
+  remind(studyId: string, cid: string, rid: string, note: string): void;
+  saveOffer(studyId: string, cid: string, rid: string, offer: Offer, reason: string): void;
+  declineRequest(studyId: string, cid: string, rid: string, reason: string): void;
+  retainOffer(studyId: string, cid: string, rid: string | null, reason: string): void;
+  addOfferFiles(studyId: string, cid: string, rid: string, files: File[]): Promise<{ added: number; rejected: RejectedFile[] }>;
+  getBlob(id: string): Promise<Blob | null>;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -71,6 +92,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   const [ready, setReady] = useState(false);
   const [studies, setStudies] = useState<Study[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const loaded = useRef(false);
 
   // Premier lancement : création automatique du projet de démonstration.
@@ -79,10 +101,12 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     (async () => {
       const s = { ...DEFAULT_SETTINGS, ...((await repo.loadSettings()) ?? {}) };
       const stored = await repo.loadStudies();
+      const storedSuppliers = await repo.loadSuppliers();
       if (cancelled) return;
+      setSuppliers(storedSuppliers ?? buildDemoSuppliers());
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [] })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [] })));
       loaded.current = true;
       setReady(true);
     })();
@@ -98,6 +122,10 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
   useEffect(() => {
     if (loaded.current) void repo.saveSettings(settings);
   }, [settings, repo]);
+
+  useEffect(() => {
+    if (loaded.current) void repo.saveSuppliers(suppliers);
+  }, [suppliers, repo]);
 
   const entry = useCallback(
     (c: TrackedChange, reason: string): HistoryEntry => ({
@@ -117,7 +145,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
           s.id === id
             ? {
                 ...s,
-                ...patch,
+                ...(typeof patch === 'function' ? patch(s) : patch),
                 updatedAt: new Date().toISOString(),
                 history: [...changes.map((c) => entry(c, reason)).reverse(), ...s.history],
               }
@@ -158,6 +186,14 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
 
   const value = useMemo<StoreValue>(() => {
     const getStudy = (id: string) => studies.find((s) => s.id === id);
+    const supplierName = (id?: string) => suppliers.find((x) => x.id === id)?.name ?? (id ? 'Fournisseur supprimé' : '');
+    /** Applique une modification à une consultation et la trace dans l'historique. */
+    const withConsultation = (studyId: string, cid: string, fn: (c: Consultation) => Consultation, changes: (c: Consultation) => TrackedChange[], reason: string) => {
+      const s = getStudy(studyId);
+      const c = s?.consultations.find((x) => x.id === cid);
+      if (!s || !c) return;
+      updateStudy(studyId, (cur) => ({ consultations: cur.consultations.map((x) => (x.id === cid ? fn(x) : x)) }), changes(c), reason);
+    };
     return {
       ready,
       studies,
@@ -189,6 +225,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       deleteStudy(id) {
         const s = getStudy(id);
         s?.documents.forEach((d) => void getFileStore().remove(d.id).catch(() => {}));
+        s?.consultations.forEach((c) => c.requests.forEach((r) => r.offer?.files.forEach((f) => void getFileStore().remove(f.id).catch(() => {}))));
         setStudies((prev) => prev.filter((x) => x.id !== id));
       },
       async addDocuments(studyId, files) {
@@ -256,6 +293,100 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
           [{ field: 'Suppression DCE', oldValue: `${doc.name} (${categoryLabel(doc.category)})`, newValue: 'supprimé' }], reason);
       },
       getFileBlob,
+      suppliers,
+      saveSupplier(data) {
+        const sup: Supplier = { ...data, id: data.id ?? newId('sup') } as Supplier;
+        setSuppliers((prev) => (prev.some((x) => x.id === sup.id) ? prev.map((x) => (x.id === sup.id ? sup : x)) : [...prev, sup]));
+        return sup;
+      },
+      deleteSupplier(id) {
+        setSuppliers((prev) => prev.filter((x) => x.id !== id));
+      },
+      createConsultation(studyId, { supplierIds, sendNow, ...data }) {
+        const sentAt = toISODate(new Date());
+        const s = getStudy(studyId);
+        const c: Consultation = {
+          ...data,
+          id: newId('c'),
+          createdAt: new Date().toISOString(),
+          requests: supplierIds.map((sid): SupplierRequest => (sendNow
+            ? { id: newId('r'), supplierId: sid, status: 'envoyee', sentAt, reminders: [] }
+            : { id: newId('r'), supplierId: sid, status: 'a-envoyer', reminders: [] })),
+        };
+        if (s) updateStudy(studyId, (cur) => ({ consultations: [...cur.consultations, c] }),
+          [{ field: 'Consultation créée', oldValue: '—', newValue: `${c.label} — ${supplierIds.length} fournisseur(s)`, target: c.id }], 'Nouvelle consultation');
+        return c;
+      },
+      updateConsultation(studyId, cid, patch, reason) {
+        withConsultation(studyId, cid, (c) => ({ ...c, ...patch }), (c) => [{ field: `Consultation ${c.label}`, oldValue: '—', newValue: 'modifiée', target: cid }], reason);
+      },
+      deleteConsultation(studyId, cid, reason) {
+        const s = getStudy(studyId);
+        const c = s?.consultations.find((x) => x.id === cid);
+        if (!s || !c) return;
+        c.requests.forEach((r) => r.offer?.files.forEach((f) => void getFileStore().remove(f.id).catch(() => {})));
+        updateStudy(studyId, (cur) => ({ consultations: cur.consultations.filter((x) => x.id !== cid) }),
+          [{ field: 'Consultation supprimée', oldValue: c.label, newValue: 'supprimée', target: cid }], reason);
+      },
+      addRequests(studyId, cid, supplierIds) {
+        withConsultation(studyId, cid, (c) => ({
+          ...c,
+          requests: [...c.requests, ...supplierIds.filter((sid) => !c.requests.some((r) => r.supplierId === sid))
+            .map((sid): SupplierRequest => ({ id: newId('r'), supplierId: sid, status: 'a-envoyer', reminders: [] }))],
+        }), (c) => [{ field: `Consultation ${c.label}`, oldValue: '—', newValue: `ajout : ${supplierIds.map(supplierName).join(', ')}`, target: cid }], 'Ajout de fournisseurs');
+      },
+      removeRequest(studyId, cid, rid, reason) {
+        withConsultation(studyId, cid, (c) => ({ ...c, requests: c.requests.filter((r) => r.id !== rid), retainedRequestId: c.retainedRequestId === rid ? undefined : c.retainedRequestId }),
+          (c) => [{ field: `Consultation ${c.label}`, oldValue: supplierName(c.requests.find((r) => r.id === rid)?.supplierId), newValue: 'retiré', target: cid }], reason);
+      },
+      markSent(studyId, cid, rids) {
+        const today = toISODate(new Date());
+        withConsultation(studyId, cid, (c) => ({ ...c, requests: c.requests.map((r) => (rids.includes(r.id) && r.status === 'a-envoyer' ? { ...r, status: 'envoyee', sentAt: today } : r)) }),
+          (c) => rids.map((rid) => ({ field: `Consultation ${c.label} — ${supplierName(c.requests.find((r) => r.id === rid)?.supplierId)}`, oldValue: 'À envoyer', newValue: 'Demande envoyée', target: cid })), 'Envoi de la demande de prix');
+      },
+      remind(studyId, cid, rid, note) {
+        const at = new Date().toISOString();
+        withConsultation(studyId, cid, (c) => ({ ...c, requests: c.requests.map((r) => (r.id === rid ? { ...r, status: 'relancee', reminders: [...r.reminders, { at, by: settings.userName, note }] } : r)) }),
+          (c) => {
+            const r = c.requests.find((x) => x.id === rid)!;
+            return [{ field: `Consultation ${c.label} — ${supplierName(r.supplierId)}`, oldValue: STATUS_LABELS[r.status], newValue: `Relance n°${r.reminders.length + 1}`, target: cid }];
+          }, note || 'Relance');
+      },
+      saveOffer(studyId, cid, rid, offer, reason) {
+        const s = getStudy(studyId);
+        withConsultation(studyId, cid, (c) => ({ ...c, requests: c.requests.map((r) => (r.id === rid ? { ...r, status: 'recue', offer, sentAt: r.sentAt ?? offer.receivedAt } : r)) }),
+          (c) => {
+            const r = c.requests.find((x) => x.id === rid)!;
+            const before = r.offer ? offerTotal(r.offer, s?.metre ?? []) : null;
+            const after = offerTotal(offer, s?.metre ?? []);
+            return [{ field: `Offre ${c.label} — ${supplierName(r.supplierId)}`, oldValue: before === null ? STATUS_LABELS[r.status] : formatEuro(before), newValue: after === null ? 'Offre reçue' : formatEuro(after), target: cid }];
+          }, reason);
+      },
+      declineRequest(studyId, cid, rid, reason) {
+        withConsultation(studyId, cid, (c) => ({ ...c, requests: c.requests.map((r) => (r.id === rid ? { ...r, status: 'declinee', declineReason: reason } : r)), retainedRequestId: c.retainedRequestId === rid ? undefined : c.retainedRequestId }),
+          (c) => [{ field: `Consultation ${c.label} — ${supplierName(c.requests.find((r) => r.id === rid)?.supplierId)}`, oldValue: STATUS_LABELS[c.requests.find((r) => r.id === rid)!.status], newValue: 'Décliné', target: cid }], reason);
+      },
+      retainOffer(studyId, cid, rid, reason) {
+        withConsultation(studyId, cid, (c) => ({ ...c, retainedRequestId: rid ?? undefined }),
+          (c) => [{ field: `Consultation ${c.label} — offre retenue`, oldValue: supplierName(c.requests.find((r) => r.id === c.retainedRequestId)?.supplierId) || '—',
+            newValue: rid ? supplierName(c.requests.find((r) => r.id === rid)?.supplierId) : 'aucune', target: cid }], reason);
+      },
+      async addOfferFiles(studyId, cid, rid, files) {
+        const rejected: RejectedFile[] = [];
+        const added: OfferFile[] = [];
+        for (const file of files) {
+          const err = validateUpload(file);
+          if (err) { rejected.push({ name: file.name, reason: err }); continue; }
+          const f: OfferFile = { id: newId('of'), name: file.name, size: file.size, kind: kindOf(file.name, file.type) };
+          try { await getFileStore().put(f.id, file); added.push(f); } catch { rejected.push({ name: file.name, reason: 'Enregistrement impossible (stockage du navigateur).' }); }
+        }
+        if (added.length) {
+          withConsultation(studyId, cid, (c) => ({ ...c, requests: c.requests.map((r) => (r.id === rid && r.offer ? { ...r, offer: { ...r.offer, files: [...r.offer.files, ...added] } } : r)) }),
+            (c) => [{ field: `Offre ${c.label} — documents`, oldValue: '—', newValue: added.map((f) => f.name).join(', '), target: cid }], 'Ajout de documents');
+        }
+        return { added: added.length, rejected };
+      },
+      getBlob: (id) => getFileStore().get(id),
       async initMetre(studyId) {
         const s = getStudy(studyId);
         if (!s) throw new Error('Étude introuvable');
@@ -383,16 +514,18 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
         setSettings((prev) => ({ ...prev, ...patch }));
       },
       resetDemo() {
+        setSuppliers((prev) => [...prev.filter((x) => !x.isDemo), ...buildDemoSuppliers()]);
         // Les fichiers de démonstration seront régénérés (version à jour).
         studies.filter((x) => x.isDemo).forEach((x) => x.documents.forEach((d) => void getFileStore().remove(d.id).catch(() => {})));
         setStudies((prev) => [...prev.filter((s) => !s.isDemo), ...buildDemoStudies(settings.userName)]);
       },
       removeDemo() {
+        setSuppliers((prev) => prev.filter((x) => !x.isDemo));
         studies.filter((x) => x.isDemo).forEach((x) => x.documents.forEach((d) => void getFileStore().remove(d.id).catch(() => {})));
         setStudies((prev) => prev.filter((s) => !s.isDemo));
       },
     };
-  }, [ready, studies, settings, updateStudy, entry, patchDocuments, getFileBlob]);
+  }, [ready, studies, settings, suppliers, updateStudy, entry, patchDocuments, getFileBlob]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

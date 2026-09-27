@@ -3,6 +3,7 @@ import { daysUntil } from './dates';
 import { missingDocs } from './catalog';
 import { summarize } from './analysis/summary';
 import { metreSummary } from './metre';
+import { consultationSummary } from './consultations';
 
 export interface StageInfo {
   id: StudyStatus;
@@ -104,8 +105,18 @@ export function nextAction(study: Study, today = new Date()): NextAction {
         reason: `${m.total - m.validated} ligne(s) à valider${m.majorGaps ? `, dont ${m.majorGaps} écart(s) > 10 %` : ''}.` };
     }
   }
-  if ((study.status === 'consultation' || study.status === 'chiffrage') && study.indicators.pendingPrices > 0) {
-    return { label: 'Relancer', tone: 'warning', reason: `${study.indicators.pendingPrices} prix fournisseur(s) en attente.` };
+  if (study.status === 'consultation' && !study.consultations?.length && study.indicators.pendingPrices === 0) {
+    return { label: 'Lancer les consultations', tone: 'info', reason: 'Aucune consultation fournisseur n’a encore été créée.' };
+  }
+  const late = study.consultations?.length ? consultationSummary(study.consultations, today).late : 0;
+  if ((study.status === 'consultation' || study.status === 'chiffrage') && late > 0) {
+    return { label: 'Relancer', tone: 'warning', reason: `${late} fournisseur(s) sans réponse après la date attendue.` };
+  }
+  const pending = study.consultations?.length
+    ? consultationSummary(study.consultations, today).waiting + consultationSummary(study.consultations, today).toSend
+    : study.indicators.pendingPrices;
+  if ((study.status === 'consultation' || study.status === 'chiffrage') && pending > 0) {
+    return { label: 'Relancer', tone: 'warning', reason: `${pending} prix fournisseur(s) en attente.` };
   }
   if (study.indicators.criticalRisks > 0 && (study.status === 'revue' || study.status === 'validation')) {
     return { label: 'Traiter les risques', tone: 'danger', reason: `${study.indicators.criticalRisks} risque(s) critique(s) avant validation.` };

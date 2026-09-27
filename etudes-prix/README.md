@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.4
+# Études de Prix CFO/CFA — V1.5
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -79,8 +79,23 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
 - Création depuis la DPGF, **mise à jour** sans perdre le travail fait, ajout de lignes manuelles et
   des prestations du CCTP absentes de la DPGF (issues de l'analyse), export **CSV** (Excel), impression.
 
-Les modules Consultations, Chiffrage, Risques, Questions, Revue et Rapports
-sont visibles dans le menu avec leur version prévue (V1.5 à V1.10).
+## Contenu de la V1.5 — Consultations fournisseurs
+
+- **Annuaire** des fournisseurs et sous-traitants (commun aux études) : contact, familles habituelles,
+  taux de réponse ; **fiche fournisseur** avec toutes ses consultations et offres.
+- **Consultation** par poste : familles et lignes du métré consultées, fournisseurs (les habituels proposés
+  en premier), date de réponse attendue ; courriel de demande de prix prérempli.
+- **Suivi** sous forme de cartes : à envoyer, en attente, en retard, relancée, offre reçue, décliné ;
+  **relance** tracée (date, auteur, note) avec courriel prérempli ; familles du périmètre non consultées.
+- **Offres** : prix unitaires sur les quantités retenues du métré (ou montant global), délai, validité,
+  exclusions, commentaire, documents joints (devis).
+- **Comparaison** : classement de la moins-disante à la plus chère, écart en %, offres expirées ou
+  incomplètes signalées, comparaison ligne par ligne ; **offre retenue** (motif obligatoire si elle
+  n'est pas la moins chère). Impression du suivi et de chaque consultation.
+- Les **prix en attente** et les **fournisseurs à relancer** alimentent le tableau de bord et la prochaine action.
+
+Les modules Chiffrage, Risques, Questions, Revue et Rapports
+sont visibles dans le menu avec leur version prévue (V1.6 à V1.10).
 
 ## Architecture
 

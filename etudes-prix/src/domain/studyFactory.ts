@@ -52,6 +52,7 @@ export function createStudyFromDraft(draft: StudyDraft, user: string, now = new 
     documents: [],
     analysisDecisions: {},
     metre: [],
+    consultations: [],
     status: 'analyse',
     progress: 5,
     isDemo: false,

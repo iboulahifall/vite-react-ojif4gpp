@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  AlertOctagon, ArrowRight, BarChart3, Calendar, FolderOpen, Ruler, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
+  AlertOctagon, ArrowRight, BarChart3, Calendar, Factory, FolderOpen, Ruler, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
   Pencil, Plus, Printer, SkipBack, Target, Trash2, User,
 } from 'lucide-react';
 import { useStore, type TrackedChange } from '../state/store';
@@ -20,6 +20,7 @@ import { GuideBanner, HelpBox, InfoTip } from '../components/ui/Help';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import { WorkflowStepper } from '../components/WorkflowStepper';
+import { pendingPricesOf } from '../domain/kpi';
 import { NextActionPill } from '../components/NextActionPill';
 import { PlanEditor } from '../components/study/PlanEditor';
 import { FamilyTree } from '../components/study/FamilyTree';
@@ -190,6 +191,7 @@ function StudyView({ study }: { study: Study }) {
             <Button variant="secondary" icon={<FileText size={16} />} onClick={() => navigate(`/etudes/${study.id}/dce`)}>DCE ({study.documents.length})</Button>
             <Button variant="secondary" icon={<BarChart3 size={16} />} onClick={() => navigate(`/etudes/${study.id}/analyse`)}>Analyse</Button>
             <Button variant="secondary" icon={<Ruler size={16} />} onClick={() => navigate(`/etudes/${study.id}/metre`)}>Métré</Button>
+            <Button variant="secondary" icon={<Factory size={16} />} onClick={() => navigate(`/etudes/${study.id}/consultations`)}>Consultations</Button>
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)} disabled={locked}>Modifier</Button>
             <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => setPending({ kind: 'delete' })} aria-label="Supprimer l’étude" title="Supprimer l’étude" className="text-red-700 hover:bg-red-50" />
@@ -205,6 +207,7 @@ function StudyView({ study }: { study: Study }) {
             {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/dce`)}>Ouvrir le DCE</Button>}
             {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/analyse`)}>Analyser</Button>}
             {study.status === 'metre' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/metre`)}>Ouvrir le métré</Button>}
+            {study.status === 'consultation' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/consultations`)}>Ouvrir les consultations</Button>}
             {next && <Button size="sm" onClick={() => setPending({ kind: 'status', to: next })}>Étape suivante <ArrowRight size={14} /></Button>}
           </>
         )}
@@ -251,12 +254,17 @@ function StudyView({ study }: { study: Study }) {
             </div>
           </Card>
           <Card>
-            <CardHeader title="Indicateurs" subtitle="Saisie manuelle en V1.1" />
+            <CardHeader title="Indicateurs" subtitle={study.consultations.length ? 'Prix en attente calculés depuis les consultations' : 'Saisie manuelle'} />
             <ul className="divide-y divide-slate-100">
               {INDICATORS.map((ind) => (
                 <li key={ind.key} className="flex items-center gap-3 px-5 py-3">
                   <span className={clsx('rounded-lg p-1.5', ind.tone)}>{ind.icon}</span>
                   <span className="flex-1 text-sm font-medium text-slate-700">{ind.label} <InfoTip text={ind.help} /></span>
+                  {ind.key === 'pendingPrices' && study.consultations.length > 0 ? (
+                    <Link to={`/etudes/${study.id}/consultations`} className="flex items-center gap-2 text-lg font-bold tabular text-brand-800 hover:underline" title="Calculé depuis les consultations">
+                      {pendingPricesOf(study)} <span className="text-xs font-normal text-slate-500">calculé</span>
+                    </Link>
+                  ) : (
                   <div className="flex items-center gap-1">
                     <button disabled={locked || study.indicators[ind.key] === 0} onClick={() => setIndicator(ind.key, study.indicators[ind.key] - 1)}
                       className="rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-40 cursor-pointer" aria-label={`Diminuer ${ind.label}`}><Minus size={14} /></button>
@@ -264,6 +272,7 @@ function StudyView({ study }: { study: Study }) {
                     <button disabled={locked} onClick={() => setIndicator(ind.key, study.indicators[ind.key] + 1)}
                       className="rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-40 cursor-pointer" aria-label={`Augmenter ${ind.label}`}><Plus size={14} /></button>
                   </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -393,7 +402,7 @@ function StudyView({ study }: { study: Study }) {
           <PrintTable head={['Remise', 'Responsable', 'Montant estimé HT', 'Étape', 'Avancement', 'Risque']}
             rows={[[`${formatDate(study.dueDate)} à ${study.dueTime}`, study.owner, formatEuro(study.estimatedAmount), `${idx + 1}/7 · ${stage.label}`, `${study.progress} %`, RISK_LABELS[study.riskLevel]]]} />
           <p className="mt-2"><strong>Prochaine action :</strong> {action.label} — {action.reason}</p>
-          <p><strong>Indicateurs :</strong> {study.indicators.criticalRisks} risque(s) critique(s) · {study.indicators.openQuestions} question(s) ouverte(s) · {study.indicators.pendingPrices} prix en attente</p>
+          <p><strong>Indicateurs :</strong> {study.indicators.criticalRisks} risque(s) critique(s) · {study.indicators.openQuestions} question(s) ouverte(s) · {pendingPricesOf(study)} prix en attente</p>
         </PrintSection>
         <PrintSection title="Plan de travail">
           <PrintTable head={['#', 'Tâche', 'Étape', 'Échéance', 'État']} align={['right', 'left', 'left', 'left', 'left']}

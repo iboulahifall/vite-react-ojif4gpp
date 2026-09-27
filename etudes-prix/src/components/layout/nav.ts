@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, BarChart3, Calculator, Factory, FileText, FolderOpen, HelpCircle, LayoutDashboard, Plus,
+  AlertTriangle, BarChart3, Building2, Calculator, Factory, FileText, FolderOpen, HelpCircle, LayoutDashboard, Plus,
   Printer, Ruler, SearchCheck, Settings, type LucideIcon,
 } from 'lucide-react';
 
@@ -22,8 +22,8 @@ export const MODULE_NAV: NavItem[] = [
   { to: '/dce', label: 'DCE', icon: FileText },
   { to: '/analyse', label: 'Analyse', icon: BarChart3 },
   { to: '/metre', label: 'Métré', icon: Ruler },
-  { to: '/modules/consultations', label: 'Consultations', icon: Factory, version: 'V1.5',
-    description: 'Consulter fournisseurs et sous-traitants, enregistrer les offres, relancer et comparer.' },
+  { to: '/consultations', label: 'Consultations', icon: Factory },
+  { to: '/fournisseurs', label: 'Fournisseurs', icon: Building2 },
   { to: '/modules/chiffrage', label: 'Chiffrage', icon: Calculator, version: 'V1.6',
     description: 'Calculer déboursé sec, prix de revient et prix de vente, avec la traçabilité de chaque prix.' },
   { to: '/modules/risques', label: 'Risques', icon: AlertTriangle, version: 'V1.7',

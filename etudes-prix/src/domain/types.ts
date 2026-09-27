@@ -41,6 +41,7 @@ export interface DceFile {
 
 import type { AnalysisResult, FindingDecision } from './analysis/types';
 import type { MetreLine } from './metre';
+import type { Consultation } from './consultations';
 
 export interface DceDocDeclaration {
   type: DceDocType;
@@ -102,6 +103,8 @@ export interface Study {
   analysisDecisions: Record<string, FindingDecision>;
   /** Métré : quantités par poste (V1.4). */
   metre: MetreLine[];
+  /** Consultations fournisseurs et sous-traitants (V1.5). */
+  consultations: Consultation[];
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -114,7 +117,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations'
 >;
 
 export interface AppSettings {

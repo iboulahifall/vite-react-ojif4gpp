@@ -1,7 +1,23 @@
 import type { RiskLevel, Study, StudyStatus } from './types';
 import { STAGES, isActive, nextAction, RISK_ORDER } from './workflow';
 import { daysUntil } from './dates';
+import { consultationSummary } from './consultations';
 import { missingDocs } from './catalog';
+
+/**
+ * Prix en attente : calculé depuis les consultations quand l'étude en a,
+ * sinon valeur saisie manuellement.
+ */
+export function pendingPricesOf(s: Study, today = new Date()): number {
+  if (!s.consultations?.length) return s.indicators.pendingPrices;
+  const sum = consultationSummary(s.consultations, today);
+  return sum.waiting + sum.toSend;
+}
+
+/** Demandes de prix sans réponse après la date attendue. */
+export function lateRequestsOf(s: Study, today = new Date()): number {
+  return s.consultations?.length ? consultationSummary(s.consultations, today).late : 0;
+}
 
 export interface DashboardKpis {
   activeCount: number;
@@ -33,7 +49,7 @@ export function computeKpis(studies: Study[], today = new Date()): DashboardKpis
     overdueCount: active.filter((s) => isOverdue(s, today)).length,
     activeAmount: active.reduce((sum, s) => sum + s.estimatedAmount, 0),
     criticalRisks: active.reduce((sum, s) => sum + s.indicators.criticalRisks, 0),
-    pendingPrices: active.reduce((sum, s) => sum + s.indicators.pendingPrices, 0),
+    pendingPrices: active.reduce((sum, s) => sum + pendingPricesOf(s, today), 0),
     readyToValidate: active.filter((s) => s.status === 'validation').length,
   };
 }
@@ -62,7 +78,7 @@ export function sortByPriority(studies: Study[], today = new Date()): Study[] {
     });
 }
 
-export type AlertKind = 'overdue' | 'due-soon' | 'critical-risk' | 'missing-dce' | 'ready';
+export type AlertKind = 'overdue' | 'due-soon' | 'critical-risk' | 'missing-dce' | 'ready' | 'relance';
 
 export interface Alert {
   kind: AlertKind;
@@ -91,6 +107,10 @@ export function computeAlerts(studies: Study[], today = new Date()): Alert[] {
     if (missing > 0) {
       alerts.push({ kind: 'missing-dce', studyId: s.id, studyName: s.name, level: 'surveiller',
         message: `${missing} pièce(s) DCE manquante(s)` });
+    }
+    const late = lateRequestsOf(s, today);
+    if (late > 0) {
+      alerts.push({ kind: 'relance', studyId: s.id, studyName: s.name, level: 'important', message: `${late} fournisseur(s) à relancer` });
     }
     if (nextAction(s, today).label === 'Valider') {
       alerts.push({ kind: 'ready', studyId: s.id, studyName: s.name, level: 'ok', message: 'Prête à être validée' });

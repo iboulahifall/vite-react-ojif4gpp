@@ -13,6 +13,11 @@ import { AnalysePage } from './pages/AnalysePage';
 import { AnalyseIndexPage } from './pages/AnalyseIndexPage';
 import { MetrePage } from './pages/MetrePage';
 import { MetreIndexPage } from './pages/MetreIndexPage';
+import { ConsultationsPage } from './pages/ConsultationsPage';
+import { ConsultationPage } from './pages/ConsultationPage';
+import { ConsultationsIndexPage } from './pages/ConsultationsIndexPage';
+import { SuppliersPage } from './pages/SuppliersPage';
+import { SupplierPage } from './pages/SupplierPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -31,6 +36,11 @@ function Routed() {
         <Route path="analyse" element={<AnalyseIndexPage />} />
         <Route path="etudes/:id/metre" element={<MetrePage />} />
         <Route path="metre" element={<MetreIndexPage />} />
+        <Route path="etudes/:id/consultations" element={<ConsultationsPage />} />
+        <Route path="etudes/:id/consultations/:cid" element={<ConsultationPage />} />
+        <Route path="consultations" element={<ConsultationsIndexPage />} />
+        <Route path="fournisseurs" element={<SuppliersPage />} />
+        <Route path="fournisseurs/:sid" element={<SupplierPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

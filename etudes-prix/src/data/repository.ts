@@ -1,4 +1,5 @@
 import type { AppSettings, Study } from '../domain/types';
+import type { Supplier } from '../domain/consultations';
 
 /**
  * Accès aux données. La V1.1 stocke dans le navigateur (localStorage) ;
@@ -10,11 +11,14 @@ export interface StudyRepository {
   saveStudies(studies: Study[]): Promise<void>;
   loadSettings(): Promise<AppSettings | null>;
   saveSettings(settings: AppSettings): Promise<void>;
+  loadSuppliers(): Promise<Supplier[] | null>;
+  saveSuppliers(suppliers: Supplier[]): Promise<void>;
   clear(): Promise<void>;
 }
 
 const STUDIES_KEY = 'etudes-prix.v1.studies';
 const SETTINGS_KEY = 'etudes-prix.v1.settings';
+const SUPPLIERS_KEY = 'etudes-prix.v1.suppliers';
 
 interface KeyValueStore {
   getItem(key: string): string | null;
@@ -70,7 +74,10 @@ export class LocalStudyRepository implements StudyRepository {
   async saveStudies(studies: Study[]) { this.write(STUDIES_KEY, studies); }
   async loadSettings() { return this.read<AppSettings>(SETTINGS_KEY); }
   async saveSettings(settings: AppSettings) { this.write(SETTINGS_KEY, settings); }
+  async loadSuppliers() { return this.read<Supplier[]>(SUPPLIERS_KEY); }
+  async saveSuppliers(suppliers: Supplier[]) { this.write(SUPPLIERS_KEY, suppliers); }
   async clear() {
+    this.store.removeItem(SUPPLIERS_KEY);
     this.store.removeItem(STUDIES_KEY);
     this.store.removeItem(SETTINGS_KEY);
   }
