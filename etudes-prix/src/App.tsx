@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HashRouter, Route, Routes } from 'react-router-dom';
-import type { StudyRepository } from './data/repository';
-import { chooseRepository } from './data/backend';
+import { findServer, localRepository, serverRepository, type BackendInfo } from './data/backend';
+import { authApi, setApiBase, type CurrentUser } from './data/api';
+import { AuthProvider, type AuthValue } from './state/auth';
+import { ChangePasswordModal, LoginScreen, SetupScreen } from './pages/AuthScreens';
+import { UsersPage } from './pages/UsersPage';
 import { StoreProvider, useStore } from './state/store';
 import { ToastProvider } from './components/ui/Toast';
 import { AppLayout } from './components/layout/AppLayout';
@@ -86,24 +89,75 @@ function Routed() {
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />
+        <Route path="utilisateurs" element={<UsersPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );
 }
 
+type Boot =
+  | { kind: 'loading' }
+  | { kind: 'local' }
+  | { kind: 'server'; base: string; info: BackendInfo; setupRequired: boolean; user: CurrentUser | null }
+  | { kind: 'error'; message: string };
+
+const Loading = () => <div className="flex h-full items-center justify-center text-slate-500">Chargement…</div>;
+
 export function App() {
-  // Stockage : le serveur s'il répond, sinon ce navigateur.
-  const [repo, setRepo] = useState<StudyRepository | null>(null);
-  useEffect(() => { void chooseRepository().then(setRepo); }, []);
-  if (!repo) return <div className="flex h-full items-center justify-center text-slate-500">Chargement…</div>;
+  // Stockage : le serveur s'il répond (avec connexion), sinon ce navigateur.
+  const [boot, setBoot] = useState<Boot>({ kind: 'loading' });
+  useEffect(() => {
+    void (async () => {
+      const srv = await findServer();
+      if (!srv) { setBoot({ kind: 'local' }); return; }
+      setApiBase(srv.base);
+      try {
+        const st = await authApi.status();
+        setBoot({ kind: 'server', base: srv.base, info: srv.info, setupRequired: st.setupRequired, user: st.user });
+      } catch (e) {
+        setBoot({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      }
+    })();
+  }, []);
+
+  const setUser = useCallback((user: CurrentUser) => setBoot((b) => (b.kind === 'server' ? { ...b, user, setupRequired: false } : b)), []);
+  const user = boot.kind === 'server' ? boot.user : null;
+  // Un dépôt par utilisateur connecté (paramètres personnels, nom dans l'historique).
+  const repo = useMemo(() => {
+    if (boot.kind === 'local') return localRepository();
+    if (boot.kind === 'server' && boot.user) return serverRepository(boot.base, boot.info, { id: boot.user.id, displayName: boot.user.displayName, isAdmin: boot.user.isAdmin });
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boot.kind, user?.id, user?.role, user?.displayName]);
+
+  const auth = useMemo<AuthValue | null>(() => (boot.kind === 'server' && boot.user ? {
+    mode: 'server', user: boot.user, canValidate: boot.user.canValidate, isAdmin: boot.user.isAdmin, setUser,
+    logout: async () => {
+      await repo?.flush?.().catch(() => {});
+      await authApi.logout().catch(() => {});
+      window.location.hash = '#/';
+      window.location.reload();
+    },
+  } : null), [boot, repo, setUser]);
+
+  if (boot.kind === 'loading') return <Loading />;
+  if (boot.kind === 'error') return <div className="flex h-full items-center justify-center p-6 text-center text-slate-700">Serveur indisponible : {boot.message}<br /><button className="mt-3 underline" onClick={() => window.location.reload()}>Réessayer</button></div>;
+  if (boot.kind === 'server' && boot.setupRequired) return <SetupScreen onDone={setUser} />;
+  if (boot.kind === 'server' && !boot.user) return <LoginScreen onDone={setUser} />;
+  if (!repo) return <Loading />;
   return (
-    <StoreProvider repository={repo}>
-      <ToastProvider>
-        <HashRouter>
-          <Routed />
-        </HashRouter>
-      </ToastProvider>
-    </StoreProvider>
+    <AuthProvider value={auth}>
+      <StoreProvider repository={repo}>
+        <ToastProvider>
+          <HashRouter>
+            <Routed />
+          </HashRouter>
+          {boot.kind === 'server' && boot.user?.mustChangePassword && (
+            <ChangePasswordModal required onDone={() => setUser({ ...boot.user!, mustChangePassword: false })} />
+          )}
+        </ToastProvider>
+      </StoreProvider>
+    </AuthProvider>
   );
 }

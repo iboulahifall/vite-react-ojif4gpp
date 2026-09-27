@@ -1,6 +1,6 @@
 import type { StudyRepository } from './repository';
 import { LocalStudyRepository } from './repository';
-import { HttpStudyRepository } from './httpRepository';
+import { HttpStudyRepository, type RepoUser } from './httpRepository';
 import { HttpFileStore } from './httpFileStore';
 import { setFileStore } from './fileStore';
 
@@ -23,16 +23,23 @@ export async function detectBackend(base = '', timeoutMs = 2500): Promise<Backen
 }
 
 /**
- * Choix du stockage au démarrage : le serveur s'il répond, sinon le navigateur.
- * `?stockage=navigateur` dans l'adresse force le stockage local.
+ * Serveur disponible ? `?stockage=navigateur` dans l'adresse force le stockage local.
+ * Le serveur pose le cookie « ep_server » : sans lui (site statique), pas de requête inutile.
  */
-export async function chooseRepository(): Promise<StudyRepository> {
+export async function findServer(): Promise<{ base: string; info: BackendInfo } | null> {
   const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
   const forceLocal = /[?&]stockage=navigateur\b/.test(window.location.search + window.location.hash);
-  // Le serveur pose le cookie « ep_server » : sans lui (site statique), pas de requête inutile.
   const served = import.meta.env.DEV || !!base || /(?:^|;\s*)ep_server=1/.test(document.cookie);
-  const info = forceLocal || !served ? null : await detectBackend(base);
-  if (!info) return new LocalStudyRepository();
+  if (forceLocal || !served) return null;
+  const info = await detectBackend(base);
+  return info ? { base, info } : null;
+}
+
+export function serverRepository(base: string, info: BackendInfo, user: RepoUser): StudyRepository {
   setFileStore(new HttpFileStore(base));
-  return new HttpStudyRepository(base, undefined, 400, info.database);
+  return new HttpStudyRepository(base, undefined, 400, info.database, user);
+}
+
+export function localRepository(): StudyRepository {
+  return new LocalStudyRepository();
 }

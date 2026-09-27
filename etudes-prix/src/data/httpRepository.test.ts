@@ -8,11 +8,13 @@ function fakeServer() {
   const rows = new Map<string, { version: number; data: Study }>();
   let initialized = false;
   let down = false;
+  let expired = false;
   const calls: string[] = [];
   const f = (async (url: string, init?: RequestInit) => {
     const method = init?.method ?? 'GET';
     calls.push(`${method} ${url}`);
     if (down) throw new TypeError('Failed to fetch');
+    if (expired) return new Response('{"detail":"Session expirée"}', { status: 401 });
     const j = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
     const m = url.match(/^\/api\/studies\/([^?]+)(?:\?baseVersion=(\d+))?$/);
     if (url === '/api/studies') return j({ initialized, items: [...rows.values()] });
@@ -30,12 +32,39 @@ function fakeServer() {
     if (m && method === 'DELETE') { rows.delete(m[1]); return new Response(null, { status: 204 }); }
     return j({}, 404);
   }) as unknown as typeof fetch;
-  return { f, rows, calls, setDown: (v: boolean) => { down = v; } };
+  return { f, rows, calls, setDown: (v: boolean) => { down = v; }, setExpired: (v: boolean) => { expired = v; } };
 }
 
 const study = (id: string, name = id) => ({ id, reference: id, name, status: 'analyse', dueDate: '2026-10-01' }) as unknown as Study;
 
 describe('dépôt serveur (HTTP)', () => {
+  it('session expirée : garde les modifications, attend la reconnexion, puis les envoie', async () => {
+    const srv = fakeServer();
+    const repo = new HttpStudyRepository('', srv.f, 0);
+    await repo.loadStudies();
+    srv.setExpired(true);
+    const states: string[] = [];
+    repo.subscribe((s) => states.push(`${s.state}:${s.pending}`));
+    await repo.saveStudies([study('a')]);
+    await repo.flush();
+    expect(states.at(-1)).toBe('auth:1');
+    await repo.saveStudies([study('a', 'modifiée pendant l’expiration')]);
+    expect(states.at(-1)).toBe('auth:1'); // pas de nouvel essai tant que non reconnecté
+    srv.setExpired(false);
+    await repo.flush();
+    expect(srv.rows.get('a')?.data.name).toBe('modifiée pendant l’expiration');
+    expect(states.at(-1)).toBe('saved:0');
+  });
+
+  it('envoie l’en-tête applicatif et le cookie de session', async () => {
+    const seen: RequestInit[] = [];
+    const f = (async (_u: string, init?: RequestInit) => { seen.push(init ?? {}); return new Response('{"version":1}', { status: 200 }); }) as unknown as typeof fetch;
+    const repo = new HttpStudyRepository('', f, 0);
+    await repo.saveStudies([study('a')]);
+    await repo.flush();
+    expect(seen[0]).toMatchObject({ method: 'PUT', credentials: 'same-origin', headers: { 'X-EP-Client': '1' } });
+  });
+
   it('base vierge → null (création de la démonstration), puis n’envoie que les études modifiées', async () => {
     const srv = fakeServer();
     const repo = new HttpStudyRepository('', srv.f, 0);

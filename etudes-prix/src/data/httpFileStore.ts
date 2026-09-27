@@ -11,20 +11,20 @@ export class HttpFileStore implements FileStore {
   async put(id: string, blob: Blob) {
     const name = blob instanceof File ? blob.name : '';
     const res = await this.fetchImpl(this.url(id), {
-      method: 'PUT', body: blob,
-      headers: { 'Content-Type': blob.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(name) },
+      method: 'PUT', body: blob, credentials: 'same-origin',
+      headers: { 'X-EP-Client': '1', 'Content-Type': blob.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(name) },
     });
     if (!res.ok) throw new Error(res.status === 413 ? 'Fichier trop volumineux pour le serveur.' : `Envoi du fichier impossible (${res.status}).`);
   }
 
   async get(id: string) {
-    const res = await this.fetchImpl(this.url(id));
+    const res = await this.fetchImpl(this.url(id), { credentials: 'same-origin' });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Lecture du fichier impossible (${res.status}).`);
     return res.blob();
   }
 
   async remove(id: string) {
-    await this.fetchImpl(this.url(id), { method: 'DELETE' });
+    await this.fetchImpl(this.url(id), { method: 'DELETE', credentials: 'same-origin', headers: { 'X-EP-Client': '1' } });
   }
 }

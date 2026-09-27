@@ -2,6 +2,8 @@ import clsx from 'clsx';
 import { NavLink } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import { SyncIndicator } from '../SyncIndicator';
+import { useAuth } from '../../state/auth';
+import { Users } from 'lucide-react';
 import { MAIN_NAV, MODULE_NAV, SETTINGS_NAV, type NavItem } from './nav';
 
 function Item({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
@@ -35,6 +37,8 @@ function Item({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) 
 }
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const auth = useAuth();
+  const isAdmin = auth.mode === 'server' && auth.isAdmin;
   return (
     <div className="flex h-full flex-col bg-slate-900">
       <div className="flex items-center gap-2.5 px-5 py-5">
@@ -56,8 +60,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </nav>
       <div className="border-t border-white/10 px-3 py-3">
+        {isAdmin && <Item item={{ to: '/utilisateurs', label: 'Utilisateurs', icon: Users }} onNavigate={onNavigate} />}
         <Item item={SETTINGS_NAV} onNavigate={onNavigate} />
-        <p className="mt-2 px-3 text-[11px] text-slate-500">Version 2.0</p>
+        <p className="mt-2 px-3 text-[11px] text-slate-500">Version 2.1</p>
         <SyncIndicator />
       </div>
     </div>

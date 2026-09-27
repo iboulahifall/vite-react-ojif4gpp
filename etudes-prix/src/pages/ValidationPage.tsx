@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { AlertTriangle, BadgeCheck, CheckCircle2, Lock, LockOpen, OctagonX, Printer, SearchCheck, Send } from 'lucide-react';
 import { useStore } from '../state/store';
+import { useAuth } from '../state/auth';
 import type { Study } from '../domain/types';
 import { snapshotOf, validationReadiness, versionLabel, VALIDATION_ITEMS, type ValidationSnapshot } from '../domain/validation';
 import { scoreOf } from '../domain/review';
@@ -53,9 +54,12 @@ function ValidationView({ study }: { study: Study }) {
   const [reserves, setReserves] = useState(false);
   const [pending, setPending] = useState<'validate' | 'unlock' | 'submit' | null>(null);
   const done = study.status === 'remise';
+  const auth = useAuth();
+  const roleBlocked = !auth.canValidate;
   const allChecked = VALIDATION_ITEMS.every((i) => checked.includes(i.id));
-  const canValidate = !v && !done && ready.reviewOk && allChecked && !!approver.trim() && (ready.blocking === 0 || reserves);
+  const canValidate = !v && !done && !roleBlocked && ready.reviewOk && allChecked && !!approver.trim() && (ready.blocking === 0 || reserves);
   const missing = [
+    roleBlocked && `validation réservée à la direction (votre rôle : ${auth.user?.roleLabel})`,
     !ready.reviewOk && ready.reason,
     !allChecked && `${VALIDATION_ITEMS.length - checked.length} case(s) à cocher`,
     !approver.trim() && 'nom de la personne ayant validé le prix',
@@ -110,6 +114,11 @@ function ValidationView({ study }: { study: Study }) {
             </Card>
           )}
 
+          {!v && !done && roleBlocked && (
+            <Card className="no-print border-l-4 border-l-sky-400 p-4 text-sm text-slate-700">
+              🔐 La validation et le déverrouillage sont réservés à la <strong>direction</strong>. Préparez l’étude (revue à jour, points vérifiés), puis demandez la validation à un responsable.
+            </Card>
+          )}
           {!v && !done && (
             <Card className="no-print">
               <CardHeader icon={<AlertTriangle size={18} className="text-amber-600" />} title="⚠️ Validation humaine" subtitle="Cochez chaque point après l’avoir vérifié vous-même." />
@@ -159,7 +168,7 @@ function ValidationView({ study }: { study: Study }) {
                   <div className="no-print flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                     <Button size="lg" onClick={() => navigate(`/etudes/${study.id}/rapport`)}>🖨️ GÉNÉRER LE DOSSIER FINAL</Button>
                     <Button variant="secondary" icon={<Send size={16} />} onClick={() => setPending('submit')}>Marquer l’offre comme remise</Button>
-                    <Button variant="ghost" icon={<LockOpen size={16} />} onClick={() => setPending('unlock')}>Déverrouiller</Button>
+                    <Button variant="ghost" icon={<LockOpen size={16} />} disabled={roleBlocked} title={roleBlocked ? 'Réservé à la direction' : undefined} onClick={() => setPending('unlock')}>Déverrouiller</Button>
                   </div>
                 )}
                 {done && <p className="no-print text-sm font-semibold text-slate-700">Offre remise — l’étude est terminée. <Link to={`/etudes/${study.id}/rapport`} className="text-brand-700 underline">Voir le dossier final</Link></p>}

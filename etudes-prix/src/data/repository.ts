@@ -18,9 +18,11 @@ export interface StudyRepository {
   readonly kind?: 'local' | 'server';
   /** État de l'enregistrement (serveur) : pour afficher « enregistré », « hors ligne », « conflit ». */
   subscribe?(listener: (s: SyncStatus) => void): () => void;
+  /** Relance l'envoi (après reconnexion). */
+  flush?(): Promise<void>;
 }
 
-export type SyncState = 'saved' | 'saving' | 'offline' | 'conflict';
+export type SyncState = 'saved' | 'saving' | 'offline' | 'conflict' | 'auth';
 export interface SyncStatus {
   state: SyncState;
   /** Modifications en attente d'envoi. */

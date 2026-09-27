@@ -48,7 +48,7 @@ interface StoreValue {
   /** Échec du chargement des données (serveur injoignable au démarrage). */
   loadError: string | null;
   /** Où sont enregistrées les données, et état de l'enregistrement sur le serveur. */
-  storage: { kind: 'local' | 'server'; status: SyncStatus | null };
+  storage: { kind: 'local' | 'server'; status: SyncStatus | null; resume(): void };
   studies: Study[];
   settings: AppSettings;
   hasDemo: boolean;
@@ -251,7 +251,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
     return {
       ready,
       loadError,
-      storage: { kind: repo.kind ?? 'local', status: sync },
+      storage: { kind: repo.kind ?? 'local', status: sync, resume: () => void repo.flush?.() },
       studies,
       settings,
       hasDemo: studies.some((s) => s.isDemo),

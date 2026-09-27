@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { Bell, ChevronDown, CircleHelp, Compass, Menu, Search, Zap } from 'lucide-react';
+import { Bell, ChevronDown, CircleHelp, Compass, KeyRound, LogOut, Menu, Search, Users, Zap } from 'lucide-react';
+import { useAuth } from '../../state/auth';
+import { ChangePasswordModal } from '../../pages/AuthScreens';
 import { useStore } from '../../state/store';
 import { computeAlerts } from '../../domain/kpi';
 import { RiskBadge, StatusBadge } from '../ui/Badges';
@@ -153,7 +155,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <li>Le <strong>mode guidé</strong> affiche des explications sur chaque écran ; le <strong>mode expert</strong> les masque.</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Version 2.0 : parcours complet — nouvelle étude, DCE, analyse CCTP / DPGF, métré, consultations fournisseurs, chiffrage, risques et questions, revue de prix, validation, rapport PDF, exports Excel / CSV et mode présentation. Données sur le serveur de l’application (partagées entre postes) ou dans ce navigateur.</p>
+        <p className="text-xs text-slate-500">Version 2.1 : parcours complet — nouvelle étude, DCE, analyse CCTP / DPGF, métré, consultations fournisseurs, chiffrage, risques et questions, revue de prix, validation, rapport PDF, exports Excel / CSV et mode présentation. Données sur le serveur de l’application (partagées entre postes) ou dans ce navigateur.</p>
       </div>
     </Modal>
   );
@@ -161,7 +163,9 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function UserMenu() {
   const { settings, updateSettings } = useStore();
+  const auth = useAuth();
   const [open, setOpen] = useState(false);
+  const [pwd, setPwd] = useState(false);
   const ref = useOutsideClose(open, () => setOpen(false));
   const initials = settings.userName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase() || '?';
   return (
@@ -170,7 +174,7 @@ function UserMenu() {
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white">{initials}</span>
         <span className="hidden text-left leading-tight lg:block">
           <span className="block text-sm font-medium text-slate-900">{settings.userName}</span>
-          <span className="block text-[11px] text-slate-500">Resp. études de prix</span>
+          <span className="block text-[11px] text-slate-500">{auth.user ? auth.user.roleLabel : 'Resp. études de prix'}</span>
         </span>
         <ChevronDown size={14} className="text-slate-400" />
       </button>
@@ -194,8 +198,17 @@ function UserMenu() {
           <Link to="/parametres" onClick={() => setOpen(false)} className="mt-1 block rounded-lg border-t border-slate-100 px-2 pt-2 pb-1 text-sm text-slate-700 hover:text-brand-700">
             Paramètres →
           </Link>
+          {auth.mode === 'server' && (
+            <div className="mt-1 space-y-0.5 border-t border-slate-100 pt-1">
+              <p className="px-2 pt-1 text-xs text-slate-500">Connecté : <strong>{auth.user?.username}</strong> · {auth.user?.roleLabel}</p>
+              {auth.isAdmin && <Link to="/utilisateurs" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"><Users size={15} /> Utilisateurs</Link>}
+              <button onClick={() => { setOpen(false); setPwd(true); }} className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50"><KeyRound size={15} /> Changer mon mot de passe</button>
+              <button onClick={() => void auth.logout()} className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-red-700 hover:bg-red-50"><LogOut size={15} /> Se déconnecter</button>
+            </div>
+          )}
         </div>
       )}
+      {pwd && <ChangePasswordModal onCancel={() => setPwd(false)} onDone={() => setPwd(false)} />}
     </div>
   );
 }

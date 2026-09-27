@@ -18,4 +18,6 @@ class Settings:
     # Application web compilée (npm run build), servie par le même serveur si présente.
     frontend_dist: Path = field(default_factory=lambda: Path(os.getenv("FRONTEND_DIST", str(BACKEND_DIR.parent / "dist"))))
     max_upload_bytes: int = field(default_factory=lambda: int(os.getenv("MAX_UPLOAD_MB", "50")) * 1024 * 1024)
+    # Cookie de session réservé au HTTPS (à activer derrière un proxy HTTPS).
+    cookie_secure: bool = field(default_factory=lambda: os.getenv("COOKIE_SECURE", "0") == "1")
     cors_origins: list[str] = field(default_factory=lambda: [o for o in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if o])

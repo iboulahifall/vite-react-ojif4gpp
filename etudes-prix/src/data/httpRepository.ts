@@ -11,6 +11,11 @@ class HttpError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
 
+/** Préférences propres à chaque utilisateur, gardées sur le poste (mode guidé / expert). */
+const prefsKey = (userId: number) => `etudes-prix.v2.prefs.${userId}`;
+
+export interface RepoUser { id: number; displayName: string; isAdmin: boolean }
+
 /**
  * Collection de documents versionnés côté serveur (études, fournisseurs) :
  * seuls les éléments modifiés sont envoyés, avec la version lue, pour que le serveur
@@ -54,7 +59,9 @@ class VersionedCollection<T extends { id: string }> {
       const res = json === null
         ? await req('DELETE', `${url}${base !== undefined ? `?baseVersion=${base}` : ''}`)
         : await req('PUT', url, `{"data":${json},"baseVersion":${base ?? 'null'}}`);
-      if (res.status === 409) {
+      if (res.status === 401) throw new HttpError(401, 'Session expirée');
+      // 409 : modifié ailleurs ; 403 : action non autorisée pour ce rôle. Dans les deux cas, rien n'est écrasé.
+      if (res.status === 409 || res.status === 403) {
         this.conflicts.add(id);
         if (this.wanted.get(id) === json) this.wanted.delete(id);
         continue;
@@ -90,12 +97,15 @@ export class HttpStudyRepository implements StudyRepository {
   private listeners = new Set<(s: SyncStatus) => void>();
   private status: SyncStatus;
 
-  constructor(private base = '', private fetchImpl: Fetch = (...a) => fetch(...a), private delay = 400, database?: string) {
+  constructor(private base = '', private fetchImpl: Fetch = (...a) => fetch(...a), private delay = 400, database?: string, private user?: RepoUser) {
     this.status = { state: 'saved', pending: 0, conflicts: [], database };
   }
 
   private req = (method: string, url: string, body?: string) =>
-    this.fetchImpl(`${this.base}${url}`, { method, body, headers: body ? { 'Content-Type': 'application/json' } : undefined });
+    this.fetchImpl(`${this.base}${url}`, {
+      method, body, credentials: 'same-origin',
+      headers: { 'X-EP-Client': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    });
 
   private async getJson<T>(url: string): Promise<T> {
     const res = await this.req('GET', url);
@@ -115,16 +125,29 @@ export class HttpStudyRepository implements StudyRepository {
     return !r.initialized && !r.items.length ? null : r.items.map((i) => i.data);
   }
 
+  /** Paramètres communs (entreprise, logo) sur le serveur ; nom = compte connecté ; mode d'affichage propre au poste. */
+  private shared(s: Partial<AppSettings>): string {
+    return JSON.stringify({ companyName: s.companyName, logo: s.logo });
+  }
+
   async loadSettings() {
     const r = await this.getJson<{ data: AppSettings | null }>('/api/settings');
-    this.settingsSaved = r.data ? JSON.stringify(r.data) : null;
-    return r.data;
+    this.settingsSaved = r.data ? this.shared(r.data) : null;
+    if (!this.user) return r.data;
+    let prefs: { guidedMode?: boolean } = {};
+    try { prefs = JSON.parse(localStorage.getItem(prefsKey(this.user.id)) ?? '{}'); } catch { /* préférences illisibles */ }
+    const base: Partial<AppSettings> = r.data ?? {};
+    return { ...base, userName: this.user.displayName, guidedMode: prefs.guidedMode ?? base.guidedMode ?? true } as AppSettings;
   }
 
   async saveStudies(studies: Study[]) { this.studies.diff(studies); this.schedule(); }
   async saveSuppliers(suppliers: Supplier[]) { this.suppliers.diff(suppliers); this.schedule(); }
   async saveSettings(settings: AppSettings) {
-    const json = JSON.stringify(settings);
+    if (this.user) {
+      try { localStorage.setItem(prefsKey(this.user.id), JSON.stringify({ guidedMode: settings.guidedMode })); } catch { /* stockage indisponible */ }
+      if (!this.user.isAdmin) return; // seuls les administrateurs modifient les paramètres de l'entreprise
+    }
+    const json = this.user ? this.shared(settings) : JSON.stringify(settings);
     this.settingsWanted = json === this.settingsSaved ? null : json;
     this.schedule();
   }
@@ -145,7 +168,7 @@ export class HttpStudyRepository implements StudyRepository {
 
   private emit(patch: Partial<SyncStatus>) {
     this.status = { ...this.status, ...patch, pending: this.pending(), conflicts: [...this.studies.conflicts, ...this.suppliers.conflicts] };
-    if (this.status.conflicts.length && this.status.state !== 'offline') this.status.state = 'conflict';
+    if (this.status.conflicts.length && this.status.state !== 'offline' && this.status.state !== 'auth') this.status.state = 'conflict';
     for (const l of this.listeners) l(this.status);
   }
 
@@ -157,8 +180,10 @@ export class HttpStudyRepository implements StudyRepository {
 
   private schedule(delay = this.delay) {
     if (this.timer) clearTimeout(this.timer);
-    if (!this.pending()) { this.emit({ state: this.status.state === 'offline' ? 'offline' : 'saved' }); return; }
-    this.emit({ state: this.status.state === 'offline' ? 'offline' : 'saving' });
+    const stuck = this.status.state === 'offline' || this.status.state === 'auth';
+    if (!this.pending()) { this.emit({ state: stuck ? this.status.state : 'saved' }); return; }
+    this.emit({ state: stuck ? this.status.state : 'saving' });
+    if (this.status.state === 'auth') return; // attend la reconnexion
     this.timer = setTimeout(() => { this.timer = null; void this.flush(); }, delay);
   }
 
@@ -174,13 +199,19 @@ export class HttpStudyRepository implements StudyRepository {
           const settings = this.settingsWanted;
           if (settings) {
             const res = await this.req('PUT', '/api/settings', `{"data":${settings}}`);
+            if (res.status === 401) throw new HttpError(401, 'Session expirée');
             if (!res.ok) throw new HttpError(res.status, 'settings');
             this.settingsSaved = settings;
             if (this.settingsWanted === settings) this.settingsWanted = null;
           }
         } while (this.again || this.pending() > 0);
         this.emit({ state: 'saved', lastSavedAt: new Date().toISOString() });
-      } catch {
+      } catch (e) {
+        if (e instanceof HttpError && e.status === 401) {
+          // Session expirée : on garde tout ; l'envoi reprendra après reconnexion.
+          this.emit({ state: 'auth' });
+          return;
+        }
         // Serveur injoignable ou en erreur : on garde tout et on réessaie.
         this.emit({ state: 'offline' });
         if (this.timer) clearTimeout(this.timer);

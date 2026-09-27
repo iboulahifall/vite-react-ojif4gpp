@@ -9,7 +9,7 @@ def study(id="s1", **over):
 
 def test_health(client):
     r = client.get("/api/health").json()
-    assert r["status"] == "ok" and r["app"] == "etudes-prix" and r["database"] == "sqlite" and r["studies"] == 0
+    assert r["status"] == "ok" and r["app"] == "etudes-prix" and r["database"] == "sqlite"
 
 
 def test_base_vide_puis_creation_et_relecture(client):

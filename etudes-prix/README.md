@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V2.0
+# Études de Prix CFO/CFA — V2.1
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -205,7 +205,26 @@ Parcours complet disponible : **nouvelle étude → DCE → analyse → métré 
 - **Sauvegarde** : copier `backend/data/` (base + fichiers), serveur arrêté ; avec PostgreSQL, `pg_dump` + le dossier des fichiers.
 
 Variables : `DATABASE_URL`, `FILES_DIR`, `FRONTEND_DIST`, `MAX_UPLOAD_MB`, `CORS_ORIGINS` (valeurs par défaut adaptées à un poste).
-Il n'y a pas encore de comptes utilisateurs : à réserver au réseau interne de l'entreprise.
+## Contenu de la V2.1 — Comptes utilisateurs et rôles
+
+- **Première configuration** : au premier accès au serveur, création du compte **administrateur**.
+- **Connexion** par identifiant et mot de passe (PBKDF2-SHA256 salé, jamais stocké en clair) ; session dans un cookie
+  HttpOnly, prolongée à l'usage (12 h d'inactivité). 5 essais erronés bloquent l'identifiant 5 minutes. Les écritures
+  exigent l'en-tête `X-EP-Client` (protection contre les requêtes forgées depuis un autre site).
+- **Rôles** : **Chiffreur** (réalise les études), **Direction** (valide et déverrouille les études), **Administrateur**
+  (tous les droits, comptes, nom et logo de l'entreprise). La règle « validation réservée à la direction » est
+  **vérifiée par le serveur** (403 sinon) ; le nom du valideur est celui du compte connecté.
+- **Utilisateurs** (menu, administrateurs) : créer un compte avec mot de passe provisoire (à changer à la première
+  connexion), changer le rôle, désactiver (la session en cours est coupée), réinitialiser le mot de passe. Il reste
+  toujours au moins un administrateur actif.
+- **Menu utilisateur** : nom et rôle, changer son mot de passe, se déconnecter. Le mode guidé / expert est propre à
+  chaque utilisateur ; le nom dans l'historique est celui du compte.
+- **Session expirée pendant le travail** : bandeau « Se reconnecter » — les modifications en attente sont gardées et
+  enregistrées après reconnexion.
+- **Mot de passe administrateur oublié** (sur la machine du serveur) : `python -m app.cli reset-password <identifiant>`
+  (et `python -m app.cli users` pour lister les comptes).
+
+En production, placer le serveur derrière un proxy **HTTPS** et définir `COOKIE_SECURE=1`.
 
 ## Architecture
 

@@ -22,7 +22,7 @@ export async function migrateLocalToServer(base = '', fetchImpl: typeof fetch = 
   const res: MigrationResult = { studies: 0, suppliers: 0, files: 0, skipped: [], missingFiles: 0 };
   const existing = new Set(((await (await fetchImpl(`${base}/api/studies`)).json()) as { items: { data: Study }[] }).items.map((i) => i.data.id));
   const existingSup = new Set(((await (await fetchImpl(`${base}/api/suppliers`)).json()) as { items: { data: Supplier }[] }).items.map((i) => i.data.id));
-  const json = (body: unknown) => ({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const json = (body: unknown) => ({ method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-EP-Client': '1' }, body: JSON.stringify(body) });
 
   for (const s of studies) {
     if (existing.has(s.id)) { res.skipped.push(s.name); continue; }
@@ -32,7 +32,7 @@ export async function migrateLocalToServer(base = '', fetchImpl: typeof fetch = 
       const blob = await files.get(f.id).catch(() => null);
       if (!blob) { res.missingFiles++; continue; }
       const r = await fetchImpl(`${base}/api/files/${encodeURIComponent(f.id)}`, {
-        method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || f.mime || 'application/octet-stream', 'X-File-Name': encodeURIComponent(f.name) },
+        method: 'PUT', body: blob, headers: { 'X-EP-Client': '1', 'Content-Type': blob.type || f.mime || 'application/octet-stream', 'X-File-Name': encodeURIComponent(f.name) },
       });
       if (r.ok) res.files++;
     }
