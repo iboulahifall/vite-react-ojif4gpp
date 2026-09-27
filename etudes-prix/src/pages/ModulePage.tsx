@@ -44,7 +44,7 @@ export function ModulePage() {
         <ol className="grid gap-1 sm:grid-cols-2">
           {ROADMAP.map(([v, l]) => (
             <li key={v} className={v === item.version ? 'font-semibold' : ''}>
-              <span className="inline-block w-14 tabular">{v}</span>{l}{v === 'V1.1' && ' ✓'}
+              <span className="inline-block w-14 tabular">{v}</span>{l}{(v === 'V1.1' || v === 'V1.2') && ' ✓'}
             </li>
           ))}
         </ol>

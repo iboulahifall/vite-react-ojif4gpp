@@ -2,6 +2,7 @@ import type { Lot, RiskLevel, Study, StudyStatus } from '../domain/types';
 import { familiesOfLots } from '../domain/catalog';
 import { addDays, toISODate } from '../domain/dates';
 import { generatePlan } from '../domain/planning';
+import { demoDocuments } from './demoFiles';
 import { defaultDceDocs } from '../domain/studyFactory';
 import { STATUS_ORDER, progressForStatus, stageIndex } from '../domain/workflow';
 
@@ -20,12 +21,15 @@ interface DemoSeed {
   pending?: number;
   missingDocs?: string[];
   market?: 'public' | 'prive';
+  /** Génère un DCE fictif consultable (projet principal uniquement). */
+  withFiles?: boolean;
 }
 
 /** Projet principal de démonstration, puis un portefeuille fictif réaliste. */
 const SEEDS: DemoSeed[] = [
   { name: 'PROJET DÉMONSTRATION — IMMEUBLE TERTIAIRE', client: 'SCI Démo Bureaux (fictif)', location: 'Lyon 3e',
-    dueIn: 5, amount: 420_000, status: 'chiffrage', progress: 68, risk: 'important', critical: 1, questions: 4, pending: 3, market: 'prive' },
+    dueIn: 5, amount: 420_000, status: 'chiffrage', progress: 68, risk: 'important', critical: 1, questions: 4, pending: 3, market: 'prive',
+    missingDocs: ['PLANS_CFA'], withFiles: true },
   { name: 'Rénovation électrique — Immeuble Haussmann', client: 'Foncière Exemple (fictif)', location: 'Paris 8e',
     dueIn: 4, amount: 265_000, status: 'revue', progress: 82, risk: 'important', questions: 2 },
   { name: 'Groupe scolaire Jean-Démo', client: 'Ville de Démoville (fictif)', location: 'Démoville',
@@ -84,6 +88,7 @@ export function buildDemoStudies(owner: string, today = new Date()): Study[] {
       lots,
       families: familiesOfLots(lots).map((f) => f.id),
       dceDocs,
+      documents: seed.withFiles ? demoDocuments(`demo-${i + 1}`, owner, createdAt) : [],
       plan,
       indicators: { criticalRisks: seed.critical ?? 0, openQuestions: seed.questions ?? 0, pendingPrices: seed.pending ?? 0 },
       notes: 'DONNÉES DE DÉMONSTRATION — projet fictif.',

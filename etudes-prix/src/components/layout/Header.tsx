@@ -153,7 +153,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <li>Le <strong>mode guidé</strong> affiche des explications sur chaque écran ; le <strong>mode expert</strong> les masque.</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Version 1.1 : tableau de bord, navigation et création d’étude. Les modules DCE, métré, consultations, chiffrage, risques, questions, revue et rapports arrivent dans les versions suivantes (voir la version indiquée dans le menu).</p>
+        <p className="text-xs text-slate-500">Version 1.2 : tableau de bord, création d’étude et gestion du DCE (import, classement, visualisation). Les modules analyse, métré, consultations, chiffrage, risques, questions, revue et rapports arrivent dans les versions suivantes (voir la version indiquée dans le menu).</p>
       </div>
     </Modal>
   );

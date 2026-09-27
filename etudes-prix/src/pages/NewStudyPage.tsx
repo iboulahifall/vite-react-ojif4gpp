@@ -20,12 +20,17 @@ import { ProjectFields } from '../components/study/ProjectFields';
 import { DceChecklist } from '../components/study/DceChecklist';
 import { FamilyTree } from '../components/study/FamilyTree';
 import { PlanEditor } from '../components/study/PlanEditor';
+import { DropZone } from '../components/dce/DropZone';
+import { FileIcon } from '../components/dce/FileIcon';
+import { SelectInput } from '../components/ui/Field';
+import { CATEGORY_ORDER, categoryLabel, classifyFileName, formatFileSize, kindOf, validateUpload } from '../domain/documents';
+import type { DceCategory } from '../domain/types';
 
 const STEPS = [
   { key: 'projet', label: 'Projet', icon: ClipboardList, title: 'Informations générales',
     guide: 'Renseignez l’identité de l’appel d’offres. Les champs marqués * sont obligatoires.' },
-  { key: 'dce', label: 'DCE', icon: FileText, title: 'Pièces du DCE',
-    guide: 'Cochez les pièces du dossier de consultation que vous avez reçues. Les pièces manquantes seront signalées.' },
+  { key: 'dce', label: 'DCE', icon: FileText, title: 'Import du DCE',
+    guide: 'Déposez les fichiers reçus : ils sont classés automatiquement. Cochez aussi les pièces reçues sans fichier. Les pièces manquantes seront signalées.' },
   { key: 'analyse', label: 'Analyse', icon: ScanSearch, title: 'Analyse du dossier',
     guide: 'L’application contrôle la cohérence du dossier déclaré et liste les points à traiter en priorité.' },
   { key: 'postes', label: 'Postes', icon: ListTree, title: 'Validation des postes',
@@ -78,7 +83,8 @@ function Summary({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function NewStudyPage() {
-  const { studies, settings, createStudy } = useStore();
+  const { studies, settings, createStudy, addDocuments } = useStore();
+  const [pendingFiles, setPendingFiles] = useState<{ key: string; file: File; category: DceCategory; error: string | null }[]>([]);
   const navigate = useNavigate();
   const toast = useToast();
   const [draft, setDraft] = useState<StudyDraft>(() => emptyDraft(settings.userName, nextReference(studies.map((s) => s.reference))));
@@ -121,11 +127,32 @@ export function NewStudyPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const start = () => {
+  const addPending = (files: File[]) => {
+    const items = files.map((file) => ({ key: `${file.name}-${file.size}-${Math.random()}`, file, category: classifyFileName(file.name), error: validateUpload(file) }));
+    setPendingFiles((p) => [...p, ...items]);
+    const cats = new Set(items.filter((i) => !i.error).map((i) => i.category));
+    patch({ dceDocs: draft.dceDocs.map((d) => (cats.has(d.type) ? { ...d, received: true } : d)) });
+  };
+
+  const setPendingCategory = (key: string, category: DceCategory) => {
+    setPendingFiles((p) => p.map((f) => (f.key === key ? { ...f, category } : f)));
+    patch({ dceDocs: draft.dceDocs.map((d) => (d.type === category ? { ...d, received: true } : d)) });
+  };
+
+  const [starting, setStarting] = useState(false);
+  const start = async () => {
+    if (starting) return;
     const e = validateProjectStep(draft);
     if (Object.keys(e).length) { setErrors(e); setStep(0); return; }
+    setStarting(true);
     const study = createStudy(draft);
-    toast(`Étude « ${study.name} » créée`);
+    const valid = pendingFiles.filter((f) => !f.error);
+    if (valid.length) {
+      const res = await addDocuments(study.id, valid.map(({ file, category }) => ({ file, category })));
+      toast(`Étude créée avec ${res.added.length} fichier(s) DCE`);
+    } else {
+      toast(`Étude « ${study.name} » créée`);
+    }
     navigate(`/etudes/${study.id}`);
   };
 
@@ -159,12 +186,34 @@ export function NewStudyPage() {
 
           {step === 1 && (
             <div className="space-y-4">
+              <DropZone onFiles={addPending} />
+              {pendingFiles.length > 0 && (
+                <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                  {pendingFiles.map((f) => (
+                    <li key={f.key} className="flex flex-wrap items-center gap-3 px-4 py-2">
+                      <FileIcon kind={kindOf(f.file.name, f.file.type)} />
+                      <span className="min-w-40 flex-1">
+                        <span className="block truncate text-sm font-medium text-slate-900">{f.file.name}</span>
+                        <span className={clsx('block text-xs', f.error ? 'font-medium text-red-700' : 'text-slate-500')}>{f.error ?? formatFileSize(f.file.size)}</span>
+                      </span>
+                      {!f.error && (
+                        <div className="w-56 shrink-0">
+                          <SelectInput value={f.category} onChange={(e) => setPendingCategory(f.key, e.target.value as DceCategory)} aria-label={`Classement de ${f.file.name}`}>
+                            {CATEGORY_ORDER.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+                          </SelectInput>
+                        </div>
+                      )}
+                      <button className="text-xs text-slate-500 underline hover:text-red-700 cursor-pointer" onClick={() => setPendingFiles((p) => p.filter((x) => x.key !== f.key))}>Retirer</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-sm font-medium text-slate-800">Pièces attendues <span className="font-normal text-slate-500">— cliquez pour déclarer une pièce reçue sans fichier</span></p>
               <DceChecklist docs={draft.dceDocs} lots={draft.lots}
                 onToggle={(t) => patch({ dceDocs: draft.dceDocs.map((d) => (d.type === t ? { ...d, received: !d.received } : d)) })} />
               <p className={clsx('rounded-lg px-3 py-2 text-sm', missing.length ? 'bg-orange-50 text-orange-900' : 'bg-emerald-50 text-emerald-900')}>
                 {missing.length ? `⚠ ${missing.length} pièce(s) manquante(s) : vous pourrez continuer et les compléter plus tard.` : '✓ Toutes les pièces attendues sont déclarées reçues.'}
               </p>
-              <p className="text-xs text-slate-500">📎 L’import et la visualisation des fichiers (PDF, Excel, Word) arrivent avec le module DCE (V1.2). Ici, vous déclarez les pièces reçues.</p>
             </div>
           )}
 
@@ -220,6 +269,7 @@ export function NewStudyPage() {
                 <Summary label="Lots">{draft.lots.join(' + ')}</Summary>
                 <Summary label="Familles retenues">{draft.families.length} / {familiesOfLots(draft.lots).length}</Summary>
                 <Summary label="Risque pressenti">{RISK_LABELS[draft.riskLevel]}</Summary>
+                <Summary label="Fichiers DCE">{pendingFiles.filter((f) => !f.error).length} à importer</Summary>
               </dl>
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="mb-2 text-sm font-semibold text-slate-900">Points d’attention</p>
@@ -239,7 +289,7 @@ export function NewStudyPage() {
             {step < STEPS.length - 1 ? (
               <Button onClick={() => goTo(step + 1)}>Continuer <ArrowRight size={16} /></Button>
             ) : (
-              <Button variant="success" size="lg" icon={<Rocket size={18} />} onClick={start}>Démarrer l’étude</Button>
+              <Button variant="success" size="lg" icon={<Rocket size={18} />} disabled={starting} onClick={() => void start()}>Démarrer l’étude</Button>
             )}
           </div>
         </div>
@@ -247,7 +297,7 @@ export function NewStudyPage() {
 
       <HelpBox>
         <p>L’assistant prépare votre étude en 6 étapes : <strong>projet → DCE → analyse → postes → plan de travail → démarrage</strong>.</p>
-        <p>Rien n’est enregistré avant le clic sur « Démarrer l’étude ». Vous pouvez revenir sur une étape déjà vue en cliquant dessus dans la barre d’étapes.</p>
+        <p>Rien n’est enregistré (ni l’étude, ni les fichiers) avant le clic sur « Démarrer l’étude ». Vous pouvez revenir sur une étape déjà vue en cliquant dessus dans la barre d’étapes.</p>
       </HelpBox>
 
       <ConfirmDialog

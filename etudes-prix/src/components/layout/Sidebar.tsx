@@ -56,7 +56,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="border-t border-white/10 px-3 py-3">
         <Item item={SETTINGS_NAV} onNavigate={onNavigate} />
-        <p className="mt-2 px-3 text-[11px] text-slate-500">Version 1.1</p>
+        <p className="mt-2 px-3 text-[11px] text-slate-500">Version 1.2</p>
       </div>
     </div>
   );

@@ -16,6 +16,29 @@ export type MarketType = 'public' | 'prive';
 
 export type DceDocType = 'RC' | 'CCAP' | 'CCTP' | 'DPGF' | 'PLANS_CFO' | 'PLANS_CFA';
 
+/** Catégorie de classement d'un fichier du DCE. */
+export type DceCategory = DceDocType | 'AUTRE';
+
+export type FileKind = 'pdf' | 'excel' | 'word' | 'image' | 'text' | 'other';
+
+/** Fichier importé dans le DCE d'une étude (le contenu binaire est stocké à part). */
+export interface DceFile {
+  id: string;
+  name: string;
+  size: number; // octets
+  mime: string;
+  kind: FileKind;
+  category: DceCategory;
+  uploadedAt: string; // ISO
+  uploadedBy: string;
+  /** Pages (PDF), feuilles (Excel) ou mots (Word), calculés après import. */
+  pages?: number;
+  sheets?: number;
+  words?: number;
+  note: string;
+  isDemo?: boolean;
+}
+
 export interface DceDocDeclaration {
   type: DceDocType;
   received: boolean;
@@ -67,6 +90,7 @@ export interface Study {
   lots: Lot[];
   families: string[];
   dceDocs: DceDocDeclaration[];
+  documents: DceFile[];
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -79,7 +103,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents'
 >;
 
 export interface AppSettings {

@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  AlertOctagon, ArrowRight, Calendar, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
+  AlertOctagon, ArrowRight, Calendar, FolderOpen, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
   Pencil, Plus, Printer, SkipBack, Target, Trash2, User,
 } from 'lucide-react';
 import { useStore, type TrackedChange } from '../state/store';
 import type { Study, StudyIndicators, StudyStatus } from '../domain/types';
 import { STAGES, nextAction, nextStatus, previousStatus, stageIndex, stageOf } from '../domain/workflow';
 import { daysUntil } from '../domain/dates';
-import { dceDocInfo, familiesOfLots, FAMILIES, isDocRelevant, MARKET_LABELS, missingDocs, RISK_LABELS } from '../domain/catalog';
+import { dceDocInfo, familiesOfLots, FAMILIES, isDocRelevant, MARKET_LABELS, RISK_LABELS } from '../domain/catalog';
 import { formatDate, formatDateTime, formatDaysLeft, formatEuro } from '../domain/format';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
@@ -23,7 +23,8 @@ import { WorkflowStepper } from '../components/WorkflowStepper';
 import { NextActionPill } from '../components/NextActionPill';
 import { PlanEditor } from '../components/study/PlanEditor';
 import { FamilyTree } from '../components/study/FamilyTree';
-import { DceChecklist } from '../components/study/DceChecklist';
+import { DceStatusBadge } from '../components/dce/DceStatusBadge';
+import { dceCompleteness, dceStatus } from '../domain/documents';
 import { EditStudyModal } from '../components/study/EditStudyModal';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
 
@@ -89,9 +90,9 @@ function StudyView({ study }: { study: Study }) {
   const prev = previousStatus(study.status);
   const action = nextAction(study);
   const days = daysUntil(study.dueDate);
-  const missing = missingDocs(study.dceDocs, study.lots);
   const families = useMemo(() => FAMILIES.filter((f) => study.families.includes(f.id)), [study.families]);
   const locked = study.status === 'remise';
+  const dceSummary = useMemo(() => dceCompleteness(study), [study]);
 
   const confirm = (reason: string) => {
     if (!pending) return;
@@ -174,7 +175,7 @@ function StudyView({ study }: { study: Study }) {
   const tabs: { id: Tab; label: string; icon: ReactNode; count?: number }[] = [
     { id: 'plan', label: 'Plan de travail', icon: <CalendarRange size={16} />, count: study.plan.filter((t) => !t.done).length },
     { id: 'postes', label: 'Périmètre / postes', icon: <ListTree size={16} />, count: study.families.length },
-    { id: 'dce', label: 'Pièces DCE', icon: <FileText size={16} />, count: missing.length || undefined },
+    { id: 'dce', label: 'Pièces DCE', icon: <FileText size={16} />, count: dceSummary.missing.length || undefined },
     { id: 'historique', label: 'Historique', icon: <History size={16} />, count: study.history.length },
   ];
 
@@ -186,6 +187,7 @@ function StudyView({ study }: { study: Study }) {
         subtitle={<>{study.reference} · {MARKET_LABELS[study.marketType]} · {study.lots.map((l) => <Tag key={l} tone="brand">{l}</Tag>)}</>}
         actions={
           <>
+            <Button variant="secondary" icon={<FileText size={16} />} onClick={() => navigate(`/etudes/${study.id}/dce`)}>DCE ({study.documents.length})</Button>
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)} disabled={locked}>Modifier</Button>
             <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => setPending({ kind: 'delete' })} aria-label="Supprimer l’étude" title="Supprimer l’étude" className="text-red-700 hover:bg-red-50" />
@@ -196,7 +198,12 @@ function StudyView({ study }: { study: Study }) {
       <GuideBanner
         step={`Étape ${idx + 1}/${STAGES.length}`}
         title={`${stage.label} — ${locked ? 'étude terminée' : 'que faire maintenant ?'}`}
-        action={next && !locked && <Button size="sm" onClick={() => setPending({ kind: 'status', to: next })}>Étape suivante <ArrowRight size={14} /></Button>}
+        action={!locked && (
+          <>
+            {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/dce`)}>Ouvrir le DCE</Button>}
+            {next && <Button size="sm" onClick={() => setPending({ kind: 'status', to: next })}>Étape suivante <ArrowRight size={14} /></Button>}
+          </>
+        )}
       >
         {stage.todo}{' '}
         {!locked && <>Une fois l’étape terminée, cliquez sur <strong>Étape suivante</strong>. L’outil dédié à cette étape arrive en {stage.module}.</>}
@@ -281,7 +288,7 @@ function StudyView({ study }: { study: Study }) {
               className={clsx('flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium cursor-pointer',
                 tab === t.id ? 'border-brand-700 text-brand-800' : 'border-transparent text-slate-500 hover:text-slate-800')}>
               {t.icon} {t.label}
-              {t.count !== undefined && <span className={clsx('rounded-full px-1.5 text-xs', t.id === 'dce' && missing.length ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600')}>{t.count}</span>}
+              {t.count !== undefined && <span className={clsx('rounded-full px-1.5 text-xs', t.id === 'dce' && dceSummary.missing.length ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600')}>{t.count}</span>}
             </button>
           ))}
         </div>
@@ -303,15 +310,38 @@ function StudyView({ study }: { study: Study }) {
               }} />
           )}
           {tab === 'dce' && (
-            <div className="space-y-3">
-              <DceChecklist docs={study.dceDocs} lots={study.lots} readOnly={locked}
-                onToggle={(type) => {
-                  const doc = study.dceDocs.find((d) => d.type === type)!;
-                  updateStudy(study.id, { dceDocs: study.dceDocs.map((d) => (d.type === type ? { ...d, received: !d.received } : d)) },
-                    [{ field: `Pièce DCE ${dceDocInfo(type).label}`, oldValue: doc.received ? 'Reçue' : 'Manquante', newValue: doc.received ? 'Manquante' : 'Reçue' }],
-                    'Mise à jour des pièces');
-                }} />
-              <p className="text-xs text-slate-500">L’import et la lecture des fichiers arrivent avec le module DCE (V1.2).</p>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-slate-700">
+                  <strong>{dceSummary.imported}/{dceSummary.expected}</strong> pièces importées · {study.documents.length} fichier(s)
+                  {dceSummary.missing.length > 0 && <span className="text-red-700"> · ⚠ manquant : {dceSummary.missing.map((m) => m.label).join(', ')}</span>}
+                </p>
+                <Button icon={<FolderOpen size={16} />} onClick={() => navigate(`/etudes/${study.id}/dce`)}>Ouvrir le DCE</Button>
+              </div>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {dceStatus(study).map((st) => (
+                  <li key={st.category} className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-2.5">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-slate-900">📄 {st.label}</span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {st.files.length ? st.files.map((f) => f.name).join(', ') : dceDocInfo(st.category).role}
+                      </span>
+                    </span>
+                    <DceStatusBadge state={st.state} />
+                    {(st.state === 'missing' || st.state === 'declared') && !locked && (
+                      <button className="text-xs font-medium text-brand-700 underline cursor-pointer" title="Pièce reçue par un autre moyen (papier, plateforme…)"
+                        onClick={() => {
+                          const received = st.state === 'missing';
+                          updateStudy(study.id, { dceDocs: study.dceDocs.map((d) => (d.type === st.category ? { ...d, received } : d)) },
+                            [{ field: `Pièce DCE ${st.label}`, oldValue: received ? 'Manquante' : 'Reçue', newValue: received ? 'Reçue (non importée)' : 'Manquante' }],
+                            'Mise à jour des pièces');
+                        }}>
+                        {st.state === 'missing' ? 'Déclarer reçue' : 'Marquer manquante'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           {tab === 'historique' && (

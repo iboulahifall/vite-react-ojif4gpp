@@ -19,8 +19,7 @@ export const MAIN_NAV: NavItem[] = [
 ];
 
 export const MODULE_NAV: NavItem[] = [
-  { to: '/modules/dce', label: 'DCE', icon: FileText, version: 'V1.2',
-    description: 'Importer, classer et ouvrir les pièces du DCE (CCTP, DPGF, plans, CCAP, RC) et repérer les documents manquants.' },
+  { to: '/dce', label: 'DCE', icon: FileText },
   { to: '/modules/analyse', label: 'Analyse', icon: BarChart3, version: 'V1.3',
     description: 'Analyser automatiquement le CCTP et la DPGF, détecter les prestations et comparer CCTP / DPGF.' },
   { to: '/modules/metre', label: 'Métré', icon: Ruler, version: 'V1.4',

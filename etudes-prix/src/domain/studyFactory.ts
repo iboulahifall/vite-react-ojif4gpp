@@ -49,6 +49,7 @@ export function createStudyFromDraft(draft: StudyDraft, user: string, now = new 
     ...draft,
     families: draft.families.filter((id) => familiesOfLots(draft.lots).some((f) => f.id === id)),
     id: newId('etude'),
+    documents: [],
     status: 'analyse',
     progress: 5,
     isDemo: false,

@@ -7,6 +7,8 @@ import { StudiesPage } from './pages/StudiesPage';
 import { NewStudyPage } from './pages/NewStudyPage';
 import { StudyPage } from './pages/StudyPage';
 import { ModulePage } from './pages/ModulePage';
+import { DcePage } from './pages/DcePage';
+import { DceIndexPage } from './pages/DceIndexPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -19,6 +21,8 @@ function Routed() {
         <Route index element={<DashboardPage />} />
         <Route path="etudes" element={<StudiesPage />} />
         <Route path="etudes/:id" element={<StudyPage />} />
+        <Route path="etudes/:id/dce" element={<DcePage />} />
+        <Route path="dce" element={<DceIndexPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

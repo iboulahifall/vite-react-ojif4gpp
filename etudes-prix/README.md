@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.1
+# Études de Prix CFO/CFA — V1.2
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -33,8 +33,23 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
 - **Impression** : mise en page A4 dédiée (en-tête, pied de page, numéro de page, référence, version)
   pour le tableau de bord, la liste et la fiche étude.
 
-Les modules DCE, Analyse, Métré, Consultations, Chiffrage, Risques, Questions, Revue et Rapports
-sont visibles dans le menu avec leur version prévue (V1.2 à V1.10).
+## Contenu de la V1.2 — DCE
+
+- **Import** par glisser-déposer ou sélection (PDF, Excel, Word, images, DWG, ZIP — 50 Mo max),
+  depuis la page DCE ou dès l'étape 2 de l'assistant « Nouvelle étude ».
+- **Classement automatique** d'après le nom du fichier (RC, CCAP, CCTP, DPGF, plans CFO / CFA,
+  autres pièces), modifiable à tout moment ; les fichiers non reconnus sont signalés « à classer ».
+- **Visualisation** intégrée : PDF (pages, zoom), Excel (feuilles, largeurs de colonnes), Word (.docx),
+  images, texte. Téléchargement de tout fichier.
+- **Documents manquants** : chaque pièce attendue est « Importée », « Reçue, non importée »,
+  « Manquante » ou « Sans objet » (plans d'un lot non chiffré).
+- Commentaire par fichier, suppression confirmée, traçabilité dans l'historique de l'étude,
+  **bordereau des pièces** imprimable.
+- Le projet de démonstration contient un DCE fictif consultable (RC, CCAP, CCTP, DPGF, plans CFO ;
+  plans CFA volontairement manquants).
+
+Les modules Analyse, Métré, Consultations, Chiffrage, Risques, Questions, Revue et Rapports
+sont visibles dans le menu avec leur version prévue (V1.3 à V1.10).
 
 ## Architecture
 
@@ -46,9 +61,10 @@ src/
   components/  interface (layout, composants UI, blocs étude)
   pages/       écrans
   print/       mise en page d'impression A4
+  lib/         lecture des fichiers (pdf.js, ExcelJS, mammoth), chargés à la demande
 ```
 
-La V1.1 enregistre les données dans le navigateur (localStorage). L'interface asynchrone
-`StudyRepository` permettra de brancher le backend prévu (FastAPI + SQLite, puis PostgreSQL)
-sans modifier les écrans. Le backend sera nécessaire à partir de la V1.2 pour l'import
-et l'extraction des documents (PDF, Excel, Word).
+Les données sont enregistrées dans le navigateur : les études dans localStorage, le contenu
+des fichiers dans IndexedDB. Elles ne sont donc pas partagées entre postes. Les interfaces
+asynchrones `StudyRepository` et `FileStore` permettront de brancher le backend prévu
+(FastAPI + SQLite, puis PostgreSQL) sans modifier les écrans.

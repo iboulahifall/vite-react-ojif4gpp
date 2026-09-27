@@ -46,3 +46,14 @@ body {
   tfoot { display: table-footer-group; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Aperçu des documents Word importés */
+.word-preview h1 { font-size: 1.4em; font-weight: 700; margin: 0.8em 0 0.4em; }
+.word-preview h2 { font-size: 1.2em; font-weight: 700; margin: 0.8em 0 0.4em; }
+.word-preview h3 { font-weight: 700; margin: 0.6em 0 0.3em; }
+.word-preview p { margin: 0.4em 0; }
+.word-preview ul { list-style: disc; padding-left: 1.5em; }
+.word-preview ol { list-style: decimal; padding-left: 1.5em; }
+.word-preview table { border-collapse: collapse; margin: 0.6em 0; }
+.word-preview td, .word-preview th { border: 1px solid #cbd5e1; padding: 2px 6px; }
+.word-preview a { color: #1d4ed8; text-decoration: underline; }
