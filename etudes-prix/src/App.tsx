@@ -11,6 +11,8 @@ import { DcePage } from './pages/DcePage';
 import { DceIndexPage } from './pages/DceIndexPage';
 import { AnalysePage } from './pages/AnalysePage';
 import { AnalyseIndexPage } from './pages/AnalyseIndexPage';
+import { MetrePage } from './pages/MetrePage';
+import { MetreIndexPage } from './pages/MetreIndexPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -27,6 +29,8 @@ function Routed() {
         <Route path="dce" element={<DceIndexPage />} />
         <Route path="etudes/:id/analyse" element={<AnalysePage />} />
         <Route path="analyse" element={<AnalyseIndexPage />} />
+        <Route path="etudes/:id/metre" element={<MetrePage />} />
+        <Route path="metre" element={<MetreIndexPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

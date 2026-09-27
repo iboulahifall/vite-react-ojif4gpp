@@ -153,7 +153,7 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             <li>Le <strong>mode guidé</strong> affiche des explications sur chaque écran ; le <strong>mode expert</strong> les masque.</li>
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Version 1.3 : tableau de bord, création d’étude, gestion du DCE et analyse automatique CCTP / DPGF. Les modules métré, consultations, chiffrage, risques, questions, revue et rapports arrivent dans les versions suivantes (voir la version indiquée dans le menu).</p>
+        <p className="text-xs text-slate-500">Version 1.3 : tableau de bord, création d’étude, gestion du DCE, analyse automatique CCTP / DPGF et métré. Les modules consultations, chiffrage, risques, questions, revue et rapports arrivent dans les versions suivantes (voir la version indiquée dans le menu).</p>
       </div>
     </Modal>
   );

@@ -10,6 +10,7 @@ import { formatEuroCompact } from './format';
 import { buildDemoStudies } from '../data/demo';
 import { LocalStudyRepository, memoryStore } from '../data/repository';
 import type { Study } from './types';
+import { metreSummary } from './metre';
 
 // Lundi 28 septembre 2026, midi.
 const TODAY = new Date(2026, 8, 28, 12);
@@ -50,6 +51,15 @@ describe('workflow', () => {
     expect(nextAction(study({ status: 'remise' }), TODAY).label).toBe('Aucune');
   });
 
+  it('au métré : créer, puis valider les quantités', () => {
+    const base = study({ dueDate: '2026-10-20', status: 'metre' });
+    expect(nextAction(base, TODAY).label).toBe('Créer le métré');
+    const demo = buildDemoStudies('T', TODAY)[0];
+    const a = nextAction({ ...demo, status: 'metre' }, TODAY);
+    expect(a.label).toBe('Valider les quantités');
+    expect(a.reason).toMatch(/écart\(s\) > 10 %/);
+  });
+
   it('propose l’analyse puis le traitement des points critiques', () => {
     const allReceived = study().dceDocs.map((d) => ({ ...d, received: true }));
     const cctp = { id: 'c', name: 'CCTP.pdf', size: 1, mime: '', kind: 'pdf' as const, category: 'CCTP' as const, uploadedAt: '', uploadedBy: '', note: '' };
@@ -88,6 +98,11 @@ describe('tableau de bord', () => {
 
   it('crée le projet de démonstration marqué comme tel', () => {
     expect(studies[0].name).toBe('PROJET DÉMONSTRATION — IMMEUBLE TERTIAIRE');
+    const m = metreSummary(studies[0].metre);
+    expect(m.total).toBe(25); // 23 lignes DPGF + 2 ajouts CCTP
+    expect(m.majorGaps).toBeGreaterThan(0);
+    expect(m.validated).toBeGreaterThan(15);
+    expect(studies.slice(1).every((s) => s.metre.length === 0)).toBe(true);
     expect(studies.every((s) => s.isDemo)).toBe(true);
   });
 

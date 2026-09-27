@@ -2,6 +2,7 @@ import type { RiskLevel, Study, StudyStatus } from './types';
 import { daysUntil } from './dates';
 import { missingDocs } from './catalog';
 import { summarize } from './analysis/summary';
+import { metreSummary } from './metre';
 
 export interface StageInfo {
   id: StudyStatus;
@@ -93,6 +94,14 @@ export function nextAction(study: Study, today = new Date()): NextAction {
     const critical = summarize(study.analysis, study.analysisDecisions).critical;
     if (critical > 0) {
       return { label: 'Traiter les points critiques', tone: 'warning', reason: `${critical} point(s) critique(s) relevé(s) par l’analyse du DCE.` };
+    }
+  }
+  if (study.status === 'metre') {
+    const m = metreSummary(study.metre);
+    if (!m.total) return { label: 'Créer le métré', tone: 'info', reason: 'Le métré n’a pas encore été établi : créez-le à partir de la DPGF.' };
+    if (m.validated < m.total) {
+      return { label: 'Valider les quantités', tone: m.majorGaps ? 'warning' : 'info',
+        reason: `${m.total - m.validated} ligne(s) à valider${m.majorGaps ? `, dont ${m.majorGaps} écart(s) > 10 %` : ''}.` };
     }
   }
   if ((study.status === 'consultation' || study.status === 'chiffrage') && study.indicators.pendingPrices > 0) {

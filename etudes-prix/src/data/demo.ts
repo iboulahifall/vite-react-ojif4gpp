@@ -3,6 +3,7 @@ import { familiesOfLots } from '../domain/catalog';
 import { addDays, toISODate } from '../domain/dates';
 import { generatePlan } from '../domain/planning';
 import { demoDocuments } from './demoFiles';
+import { buildDemoMetre } from './demoMetre';
 import { defaultDceDocs } from '../domain/studyFactory';
 import { STATUS_ORDER, progressForStatus, stageIndex } from '../domain/workflow';
 
@@ -90,6 +91,7 @@ export function buildDemoStudies(owner: string, today = new Date()): Study[] {
       dceDocs,
       documents: seed.withFiles ? demoDocuments(`demo-${i + 1}`, owner, createdAt) : [],
       analysisDecisions: {},
+      metre: seed.withFiles ? buildDemoMetre(`demo-${i + 1}`, owner, iso) : [],
       plan,
       indicators: { criticalRisks: seed.critical ?? 0, openQuestions: seed.questions ?? 0, pendingPrices: seed.pending ?? 0 },
       notes: 'DONNÉES DE DÉMONSTRATION — projet fictif.',

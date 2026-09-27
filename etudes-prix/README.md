@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.3
+# Études de Prix CFO/CFA — V1.4
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -64,8 +64,23 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
 - L'analyse est **par règles métier** (déterministe, sans service externe) : elle propose des points à examiner
   et ne remplace pas la lecture du dossier. Les documents scannés (images) ne sont pas lus.
 
-Les modules Métré, Consultations, Chiffrage, Risques, Questions, Revue et Rapports
-sont visibles dans le menu avec leur version prévue (V1.4 à V1.10).
+## Contenu de la V1.4 — Postes et métré
+
+- **Postes** : arborescence CFO / CFA ; un clic sur une famille affiche ses lignes, avec l'avancement
+  de validation, les écarts importants (▲) et les quantités à établir (⚠).
+- **Métré type tableur** : colonnes Poste, Désignation, Unité, DPGF, Calculé, Retenu, Écart, État ;
+  tri, filtres (écarts > 10 %, à établir, à valider, validées), recherche, colonnes redimensionnables,
+  en-têtes fixes, saisie directe au clavier (Entrée / Échap).
+- **Quantités** : la quantité calculée se saisit directement ou par un **détail** (quantité × coefficient) ;
+  la quantité retenue est proposée (calculée, sinon DPGF) tant qu'elle n'est pas saisie.
+- **Écarts** avec la DPGF affichés par symbole + valeur + pourcentage (▲ / ▼, rouge au-delà de 10 %).
+- **Validation** ligne par ligne ou groupée (lignes sans écart important) ; modifier une quantité validée
+  demande une confirmation avec motif et impose une revalidation. **Historique** propre à chaque ligne.
+- Création depuis la DPGF, **mise à jour** sans perdre le travail fait, ajout de lignes manuelles et
+  des prestations du CCTP absentes de la DPGF (issues de l'analyse), export **CSV** (Excel), impression.
+
+Les modules Consultations, Chiffrage, Risques, Questions, Revue et Rapports
+sont visibles dans le menu avec leur version prévue (V1.5 à V1.10).
 
 ## Architecture
 

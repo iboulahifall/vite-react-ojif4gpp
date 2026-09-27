@@ -25,6 +25,7 @@ import { FileIcon } from '../components/dce/FileIcon';
 import { DceStatusBadge } from '../components/dce/DceStatusBadge';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
 import { docFacts } from '../domain/analysis/summary';
+import { downloadBlob } from '../lib/download';
 
 export function DcePage() {
   const { id = '' } = useParams();
@@ -111,12 +112,7 @@ function DceView({ study }: { study: Study }) {
 
   const download = () => {
     if (!blob || !selected) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = selected.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, selected.name);
   };
 
   const openInTab = () => {

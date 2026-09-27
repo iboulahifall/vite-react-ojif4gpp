@@ -21,8 +21,7 @@ export const MAIN_NAV: NavItem[] = [
 export const MODULE_NAV: NavItem[] = [
   { to: '/dce', label: 'DCE', icon: FileText },
   { to: '/analyse', label: 'Analyse', icon: BarChart3 },
-  { to: '/modules/metre', label: 'Métré', icon: Ruler, version: 'V1.4',
-    description: 'Consulter les postes CFO/CFA, saisir les quantités, visualiser les écarts avec la DPGF et valider.' },
+  { to: '/metre', label: 'Métré', icon: Ruler },
   { to: '/modules/consultations', label: 'Consultations', icon: Factory, version: 'V1.5',
     description: 'Consulter fournisseurs et sous-traitants, enregistrer les offres, relancer et comparer.' },
   { to: '/modules/chiffrage', label: 'Chiffrage', icon: Calculator, version: 'V1.6',

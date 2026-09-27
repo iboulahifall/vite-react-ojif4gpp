@@ -5,9 +5,12 @@ import { buildDemoFile } from '../data/demoFiles';
 import { categoryLabel, kindOf, syncDeclarations, validateUpload, type RejectedFile } from '../domain/documents';
 import { inspectFile } from '../lib/inspectFile';
 import { extractSheets, extractText } from '../lib/extractText';
-import { analyse } from '../domain/analysis/analyse';
 import { summarize } from '../domain/analysis/summary';
-import type { AnalysisResult, FindingStatus } from '../domain/analysis/types';
+import type { AnalysisResult, DpgfLine, FindingStatus } from '../domain/analysis/types';
+import { analyse, dceSignature } from '../domain/analysis/analyse';
+import { parseDpgf } from '../domain/analysis/dpgf';
+import { effectiveQty, formatQty, mergeDpgf, type MergeResult, type MetreLine } from '../domain/metre';
+import { FAMILIES } from '../domain/catalog';
 import { LocalStudyRepository, type StudyRepository } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
@@ -24,7 +27,11 @@ export interface TrackedChange {
   field: string;
   oldValue: string;
   newValue: string;
+  target?: string;
 }
+
+/** Champs d'une ligne de métré modifiables par l'utilisateur. */
+export type MetreLinePatch = Partial<Pick<MetreLine, 'calcQty' | 'calcDetail' | 'retainedQty' | 'familyId' | 'comment' | 'designation' | 'unit' | 'ref'>>;
 
 interface StoreValue {
   ready: boolean;
@@ -46,6 +53,12 @@ interface StoreValue {
   /** Analyse automatique du DCE ; `onStep` reçoit chaque étape réalisée. */
   runAnalysis(studyId: string, onStep?: (label: string) => void): Promise<AnalysisResult>;
   decideFinding(studyId: string, findingId: string, status: FindingStatus, comment: string): void;
+  /** Crée ou met à jour le métré depuis la DPGF (le travail déjà fait est conservé). */
+  initMetre(studyId: string): Promise<MergeResult>;
+  updateMetreLine(studyId: string, lineId: string, patch: MetreLinePatch, reason: string): void;
+  addMetreLine(studyId: string, line: Pick<MetreLine, 'familyId' | 'ref' | 'designation' | 'unit'> & Partial<MetreLine>): MetreLine;
+  removeMetreLine(studyId: string, lineId: string, reason: string): void;
+  setMetreValidation(studyId: string, lineIds: string[], validated: boolean, reason: string): void;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -69,7 +82,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       if (cancelled) return;
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {} })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [] })));
       loaded.current = true;
       setReady(true);
     })();
@@ -243,6 +256,84 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
           [{ field: 'Suppression DCE', oldValue: `${doc.name} (${categoryLabel(doc.category)})`, newValue: 'supprimé' }], reason);
       },
       getFileBlob,
+      async initMetre(studyId) {
+        const s = getStudy(studyId);
+        if (!s) throw new Error('Étude introuvable');
+        let dpgfLines: DpgfLine[] | null = null;
+        // Réutilise la lecture de la DPGF faite par l'analyse si le DCE n'a pas changé.
+        if (s.analysis?.dpgf && s.analysis.dceSignature === dceSignature(s.documents)) dpgfLines = s.analysis.dpgfLines;
+        if (!dpgfLines) {
+          const dd = s.documents.find((x) => x.category === 'DPGF' && x.kind === 'excel' && !/\.xls$/i.test(x.name));
+          if (!dd) throw new Error('Aucune DPGF au format Excel ou CSV dans le DCE.');
+          const blob = await getFileBlob(dd);
+          if (!blob) throw new Error('Le contenu de la DPGF n’est plus disponible : réimportez-la.');
+          const sheets = await extractSheets(blob, dd.name);
+          dpgfLines = sheets.map((sh) => parseDpgf(sh.rows)).sort((a, b) => b.length - a.length)[0] ?? [];
+          if (!dpgfLines.length) throw new Error('Les colonnes « Désignation » et « Unité » n’ont pas été trouvées dans la DPGF.');
+        }
+        const res = mergeDpgf(s.metre, dpgfLines, () => newId('m'));
+        updateStudy(studyId, { metre: res.lines }, [{
+          field: 'Métré',
+          oldValue: s.metre.length ? `${s.metre.length} ligne(s)` : '—',
+          newValue: `${res.lines.length} ligne(s) : ${res.added} ajoutée(s), ${res.updated} modifiée(s), ${res.removed} retirée(s) de la DPGF`,
+        }], s.metre.length ? 'Mise à jour depuis la DPGF' : 'Initialisation depuis la DPGF');
+        return res;
+      },
+      updateMetreLine(studyId, lineId, patch, reason) {
+        const s = getStudy(studyId);
+        const l = s?.metre.find((x) => x.id === lineId);
+        if (!s || !l) return;
+        const next: MetreLine = { ...l, ...patch };
+        const label = `Métré ${l.ref || l.designation}`;
+        const changes: TrackedChange[] = [];
+        const q = (n: number | null) => (n === null ? '—' : `${formatQty(n)} ${l.unit}`.trim());
+        if ('calcQty' in patch && patch.calcQty !== l.calcQty) changes.push({ field: `${label} — calculé`, oldValue: q(l.calcQty), newValue: q(next.calcQty), target: lineId });
+        if ('retainedQty' in patch && patch.retainedQty !== l.retainedQty) changes.push({ field: `${label} — retenu`, oldValue: q(effectiveQty(l)), newValue: q(effectiveQty(next)), target: lineId });
+        if ('familyId' in patch && patch.familyId !== l.familyId) {
+          const fam = (id: string | null) => FAMILIES.find((f) => f.id === id)?.label ?? 'À rattacher';
+          changes.push({ field: `${label} — famille`, oldValue: fam(l.familyId), newValue: fam(next.familyId), target: lineId });
+        }
+        if ('comment' in patch && patch.comment !== l.comment) changes.push({ field: `${label} — commentaire`, oldValue: l.comment || '—', newValue: next.comment || '—', target: lineId });
+        for (const k of ['designation', 'unit', 'ref'] as const) {
+          if (k in patch && patch[k] !== l[k]) changes.push({ field: `${label} — ${k === 'ref' ? 'poste' : k === 'unit' ? 'unité' : 'désignation'}`, oldValue: l[k] || '—', newValue: next[k] || '—', target: lineId });
+        }
+        if (!changes.length) return;
+        // Une quantité modifiée après validation doit être revalidée.
+        if (l.validated && effectiveQty(next) !== effectiveQty(l)) {
+          next.validated = false;
+          changes.push({ field: `${label} — validation`, oldValue: 'Validée', newValue: 'À revalider', target: lineId });
+        }
+        updateStudy(studyId, { metre: s.metre.map((x) => (x.id === lineId ? next : x)) }, changes, reason);
+      },
+      addMetreLine(studyId, data) {
+        const s = getStudy(studyId);
+        const line: MetreLine = { calcQty: null, calcDetail: [], retainedQty: null, dpgfQty: null, validated: false, section: 'Ajouts', comment: '', ...data, id: newId('m'), source: 'manuel' };
+        if (s) updateStudy(studyId, { metre: [...s.metre, line] }, [{ field: 'Métré — ligne ajoutée', oldValue: '—', newValue: `${line.ref} ${line.designation}`.trim(), target: line.id }], 'Ajout manuel');
+        return line;
+      },
+      removeMetreLine(studyId, lineId, reason) {
+        const s = getStudy(studyId);
+        const l = s?.metre.find((x) => x.id === lineId);
+        if (!s || !l) return;
+        updateStudy(studyId, { metre: s.metre.filter((x) => x.id !== lineId) }, [{ field: 'Métré — ligne supprimée', oldValue: `${l.ref} ${l.designation}`.trim(), newValue: 'supprimée', target: lineId }], reason);
+      },
+      setMetreValidation(studyId, lineIds, validated, reason) {
+        const s = getStudy(studyId);
+        if (!s) return;
+        const now = new Date().toISOString();
+        const changes: TrackedChange[] = [];
+        const metre = s.metre.map((l) => {
+          if (!lineIds.includes(l.id) || l.validated === validated) return l;
+          const q = effectiveQty(l);
+          if (validated && q === null) return l; // rien à valider sans quantité
+          changes.push({ field: `Métré ${l.ref || l.designation} — validation`, oldValue: validated ? 'À valider' : 'Validée',
+            newValue: validated ? `Validée (${formatQty(q)} ${l.unit})` : 'Dévalidée', target: l.id });
+          return validated
+            ? { ...l, validated: true, retainedQty: q, validatedBy: settings.userName, validatedAt: now }
+            : { ...l, validated: false, validatedBy: undefined, validatedAt: undefined };
+        });
+        if (changes.length) updateStudy(studyId, { metre }, changes, reason);
+      },
       async runAnalysis(studyId, onStep) {
         const s = getStudy(studyId);
         if (!s) throw new Error('Étude introuvable');
