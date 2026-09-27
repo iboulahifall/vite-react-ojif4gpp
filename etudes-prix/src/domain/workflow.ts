@@ -1,6 +1,7 @@
 import type { RiskLevel, Study, StudyStatus } from './types';
 import { daysUntil } from './dates';
 import { missingDocs } from './catalog';
+import { summarize } from './analysis/summary';
 
 export interface StageInfo {
   id: StudyStatus;
@@ -84,6 +85,15 @@ export function nextAction(study: Study, today = new Date()): NextAction {
   const missing = missingDocs(study.dceDocs, study.lots).length;
   if (study.status === 'analyse' && missing > 0) {
     return { label: 'Compléter le DCE', tone: 'warning', reason: `${missing} pièce(s) du DCE manquante(s).` };
+  }
+  if (study.status === 'analyse' && study.documents.some((d) => d.category === 'CCTP')) {
+    if (!study.analysis) {
+      return { label: 'Lancer l’analyse', tone: 'info', reason: 'Le CCTP est importé : lancez l’analyse automatique du DCE.' };
+    }
+    const critical = summarize(study.analysis, study.analysisDecisions).critical;
+    if (critical > 0) {
+      return { label: 'Traiter les points critiques', tone: 'warning', reason: `${critical} point(s) critique(s) relevé(s) par l’analyse du DCE.` };
+    }
   }
   if ((study.status === 'consultation' || study.status === 'chiffrage') && study.indicators.pendingPrices > 0) {
     return { label: 'Relancer', tone: 'warning', reason: `${study.indicators.pendingPrices} prix fournisseur(s) en attente.` };

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
-  AlertOctagon, ArrowRight, Calendar, FolderOpen, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
+  AlertOctagon, ArrowRight, BarChart3, Calendar, FolderOpen, CalendarRange, Euro, FileText, HelpCircle, History, Hourglass, ListTree, Minus,
   Pencil, Plus, Printer, SkipBack, Target, Trash2, User,
 } from 'lucide-react';
 import { useStore, type TrackedChange } from '../state/store';
@@ -188,6 +188,7 @@ function StudyView({ study }: { study: Study }) {
         actions={
           <>
             <Button variant="secondary" icon={<FileText size={16} />} onClick={() => navigate(`/etudes/${study.id}/dce`)}>DCE ({study.documents.length})</Button>
+            <Button variant="secondary" icon={<BarChart3 size={16} />} onClick={() => navigate(`/etudes/${study.id}/analyse`)}>Analyse</Button>
             <Button variant="secondary" icon={<Printer size={16} />} onClick={() => window.print()}>Imprimer</Button>
             <Button variant="secondary" icon={<Pencil size={16} />} onClick={() => setEditing(true)} disabled={locked}>Modifier</Button>
             <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => setPending({ kind: 'delete' })} aria-label="Supprimer l’étude" title="Supprimer l’étude" className="text-red-700 hover:bg-red-50" />
@@ -201,6 +202,7 @@ function StudyView({ study }: { study: Study }) {
         action={!locked && (
           <>
             {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/dce`)}>Ouvrir le DCE</Button>}
+            {study.status === 'analyse' && <Button size="sm" variant="secondary" onClick={() => navigate(`/etudes/${study.id}/analyse`)}>Analyser</Button>}
             {next && <Button size="sm" onClick={() => setPending({ kind: 'status', to: next })}>Étape suivante <ArrowRight size={14} /></Button>}
           </>
         )}

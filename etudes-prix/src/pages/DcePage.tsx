@@ -24,6 +24,7 @@ import { FileViewer } from '../components/dce/FileViewer';
 import { FileIcon } from '../components/dce/FileIcon';
 import { DceStatusBadge } from '../components/dce/DceStatusBadge';
 import { PrintDocument, PrintSection, PrintTable } from '../print/PrintDocument';
+import { docFacts } from '../domain/analysis/summary';
 
 export function DcePage() {
   const { id = '' } = useParams();
@@ -51,6 +52,7 @@ function DceView({ study }: { study: Study }) {
   const status = useMemo(() => dceStatus(study), [study]);
   const completeness = useMemo(() => dceCompleteness(study), [study]);
   const selectedId = params.get('doc') ?? study.documents[0]?.id ?? null;
+  const initialPage = Number(params.get('page')) || undefined;
   const selected = study.documents.find((d) => d.id === selectedId) ?? null;
   // Le contenu chargé est lié à son document : jamais d'aperçu d'un fichier avec le contenu du précédent.
   const [loaded, setLoaded] = useState<{ id: string; blob: Blob } | null>(null);
@@ -67,6 +69,7 @@ function DceView({ study }: { study: Study }) {
   const select = (docId: string) => {
     const p = new URLSearchParams(params);
     p.set('doc', docId);
+    p.delete('page');
     setParams(p, { replace: true });
   };
 
@@ -124,6 +127,7 @@ function DceView({ study }: { study: Study }) {
   };
 
   const unclassified = study.documents.filter((d) => d.category === 'AUTRE');
+  const facts = study.analysis && selected ? docFacts(study.analysis, selected.id, study.analysisDecisions) : null;
   const recentUnclassified = unclassified.filter((d) => recent.includes(d.id));
 
   return (
@@ -228,7 +232,7 @@ function DceView({ study }: { study: Study }) {
                     Le contenu de ce fichier n’est plus disponible dans ce navigateur (données effacées ou autre poste). Réimportez-le.
                   </div>
                 )}
-                {blob && <FileViewer doc={selected} blob={blob} />}
+                {blob && <FileViewer doc={selected} blob={blob} initialPage={initialPage} />}
               </div>
             </>
           ) : (
@@ -285,10 +289,18 @@ function DceView({ study }: { study: Study }) {
             <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500"><Sparkles size={14} /> Analyse du document</div>
             <div className="space-y-2 p-4 text-sm">
               <AnalysisRow label="Pages" value={selected?.pages ?? '—'} />
-              <AnalysisRow label="Prestations détectées" value="V1.3" muted />
-              <AnalysisRow label="Points critiques" value="V1.3" muted />
-              <AnalysisRow label="Questions" value="V1.3" muted />
-              <p className="pt-1 text-xs text-slate-500">L’analyse automatique du CCTP et de la DPGF (prestations, points critiques, questions) arrive en V1.3.</p>
+              {facts?.analysed ? (
+                <>
+                  <AnalysisRow label={selected?.category === 'DPGF' ? 'Lignes lues' : 'Prestations détectées'} value={facts.prestations} />
+                  <AnalysisRow label="Points critiques" value={facts.critical} />
+                  <AnalysisRow label="Questions" value={facts.questions} />
+                </>
+              ) : (
+                <p className="pt-1 text-xs text-slate-500">{study.analysis ? 'Ce document n’a pas été lu par la dernière analyse.' : 'Aucune analyse lancée pour cette étude.'}</p>
+              )}
+              <Link to={`/etudes/${study.id}/analyse`} className="inline-block pt-1 text-xs font-medium text-brand-700 hover:underline">
+                {study.analysis ? 'Voir l’analyse complète →' : 'Lancer l’analyse →'}
+              </Link>
             </div>
           </Card>
         </div>

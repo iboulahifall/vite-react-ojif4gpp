@@ -89,6 +89,7 @@ export function buildDemoStudies(owner: string, today = new Date()): Study[] {
       families: familiesOfLots(lots).map((f) => f.id),
       dceDocs,
       documents: seed.withFiles ? demoDocuments(`demo-${i + 1}`, owner, createdAt) : [],
+      analysisDecisions: {},
       plan,
       indicators: { criticalRisks: seed.critical ?? 0, openQuestions: seed.questions ?? 0, pendingPrices: seed.pending ?? 0 },
       notes: 'DONNÉES DE DÉMONSTRATION — projet fictif.',

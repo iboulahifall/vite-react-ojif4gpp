@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.2
+# Études de Prix CFO/CFA — V1.3
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -48,14 +48,30 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
 - Le projet de démonstration contient un DCE fictif consultable (RC, CCAP, CCTP, DPGF, plans CFO ;
   plans CFA volontairement manquants).
 
-Les modules Analyse, Métré, Consultations, Chiffrage, Risques, Questions, Revue et Rapports
-sont visibles dans le menu avec leur version prévue (V1.3 à V1.10).
+## Contenu de la V1.3 — Analyse CCTP / DPGF
+
+- **Lecture des pièces** : texte des PDF (pdf.js) et Word (.docx) page par page, lignes de la DPGF Excel / CSV
+  (repérage automatique des colonnes N°, Désignation, Unité, Quantité et des sections).
+- **Prestations détectées** : environ 35 prestations CFO / CFA reconnues dans le CCTP (TGBT, BAES, SSI, VDI, IRVE…),
+  rangées par famille avec leurs pages.
+- **Comparaison CCTP / DPGF** : concordant, absent de la DPGF (oubli), non décrit au CCTP (spécifications manquantes),
+  quantités à établir, lignes non rattachées, prestations hors périmètre retenu.
+- **Clauses à risque** (RC, CCAP, CCTP) : hypothèses « à confirmer », pénalités sans plafond, site occupé,
+  horaires décalés, amiante, PSE, variantes, annexes citées, clause d'exhaustivité…
+- **Page Analyse** : cartes Points critiques / À vérifier / Confirmés / Questions, chaque point relié à sa source
+  (ouverture du document à la bonne page), décisions « traité » / « écarté » avec motif, conservées après
+  une nouvelle analyse, alerte si le DCE a changé, questions proposées copiables, rapport imprimable.
+- L'analyse est **par règles métier** (déterministe, sans service externe) : elle propose des points à examiner
+  et ne remplace pas la lecture du dossier. Les documents scannés (images) ne sont pas lus.
+
+Les modules Métré, Consultations, Chiffrage, Risques, Questions, Revue et Rapports
+sont visibles dans le menu avec leur version prévue (V1.4 à V1.10).
 
 ## Architecture
 
 ```
 src/
-  domain/      logique métier pure et testée (workflow, planning, KPI, pré-analyse)
+  domain/      logique métier pure et testée (workflow, planning, KPI, pré-analyse, analysis/ : règles d'analyse)
   data/        accès aux données (interface StudyRepository) + données de démonstration
   state/       état applicatif React (historique des modifications)
   components/  interface (layout, composants UI, blocs étude)

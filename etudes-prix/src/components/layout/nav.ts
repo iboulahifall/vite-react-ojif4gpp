@@ -20,8 +20,7 @@ export const MAIN_NAV: NavItem[] = [
 
 export const MODULE_NAV: NavItem[] = [
   { to: '/dce', label: 'DCE', icon: FileText },
-  { to: '/modules/analyse', label: 'Analyse', icon: BarChart3, version: 'V1.3',
-    description: 'Analyser automatiquement le CCTP et la DPGF, détecter les prestations et comparer CCTP / DPGF.' },
+  { to: '/analyse', label: 'Analyse', icon: BarChart3 },
   { to: '/modules/metre', label: 'Métré', icon: Ruler, version: 'V1.4',
     description: 'Consulter les postes CFO/CFA, saisir les quantités, visualiser les écarts avec la DPGF et valider.' },
   { to: '/modules/consultations', label: 'Consultations', icon: Factory, version: 'V1.5',

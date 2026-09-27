@@ -114,6 +114,7 @@ export const DEMO_DPGF: { section: string; lines: DpgfLine[] }[] = [
     { n: '13.1.9', d: 'Alimentations CVC (CTA, groupes, VMC)', u: 'ens', q: 1 },
     { n: '13.1.10', d: 'Bornes de recharge VE 7 kW', u: 'u', q: 6 },
     { n: '13.1.11', d: 'Pré-équipement IRVE (fourreaux + réservation TGBT)', u: 'place', q: 12 },
+    { n: '13.1.12', d: 'Groupe électrogène de secours 60 kVA', u: 'ens', q: 1 },
   ] },
   { section: '13.2 COURANTS FAIBLES', lines: [
     { n: '13.2.1', d: 'SSI catégorie A — ECS / CMSI adressable', u: 'ens', q: 1 },
@@ -122,7 +123,7 @@ export const DEMO_DPGF: { section: string; lines: DpgfLine[] }[] = [
     { n: '13.2.4', d: 'Diffuseurs sonores et lumineux', u: 'u', q: 38 },
     { n: '13.2.5', d: 'Prises RJ45 cat. 6A', u: 'u', q: 560 },
     { n: '13.2.6', d: 'Baies de brassage 42U', u: 'u', q: 4 },
-    { n: '13.2.7', d: 'Rocade fibre optique OM4 12 brins', u: 'ml', q: 60 },
+    { n: '13.2.7', d: 'Rocade fibre optique OM4 12 brins', u: 'ml', q: null },
     { n: '13.2.8', d: 'Lecteurs de badges contrôle d’accès', u: 'u', q: 18 },
     { n: '13.2.9', d: 'Caméras IP + enregistreur 30 jours', u: 'ens', q: 1 },
     { n: '13.2.10', d: 'GTB BACnet/IP — supervision et points', u: 'ens', q: 1 },

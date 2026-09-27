@@ -49,6 +49,18 @@ describe('workflow', () => {
     expect(nextAction(study({ dueDate: '2026-10-20', status: 'validation' }), TODAY).label).toBe('Valider');
     expect(nextAction(study({ status: 'remise' }), TODAY).label).toBe('Aucune');
   });
+
+  it('propose l’analyse puis le traitement des points critiques', () => {
+    const allReceived = study().dceDocs.map((d) => ({ ...d, received: true }));
+    const cctp = { id: 'c', name: 'CCTP.pdf', size: 1, mime: '', kind: 'pdf' as const, category: 'CCTP' as const, uploadedAt: '', uploadedBy: '', note: '' };
+    const base = study({ dueDate: '2026-10-20', dceDocs: allReceived, documents: [cctp] });
+    expect(nextAction(base, TODAY).label).toBe('Lancer l’analyse');
+    const finding = { id: 'f1', level: 'critique' as const, category: 'clause' as const, title: 'x', detail: '' };
+    const analysis = { runAt: '', runBy: '', dceSignature: '', documentsRead: [], prestations: [], dpgfLines: [], comparison: [], findings: [finding] };
+    expect(nextAction({ ...base, analysis }, TODAY).label).toBe('Traiter les points critiques');
+    const treated = { ...base, analysis, analysisDecisions: { f1: { status: 'traite' as const, comment: '', by: '', at: '' } } };
+    expect(nextAction(treated, TODAY).label).toBe('Analyser le DCE');
+  });
 });
 
 describe('planning', () => {

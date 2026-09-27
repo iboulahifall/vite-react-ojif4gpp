@@ -39,6 +39,8 @@ export interface DceFile {
   isDemo?: boolean;
 }
 
+import type { AnalysisResult, FindingDecision } from './analysis/types';
+
 export interface DceDocDeclaration {
   type: DceDocType;
   received: boolean;
@@ -91,6 +93,10 @@ export interface Study {
   families: string[];
   dceDocs: DceDocDeclaration[];
   documents: DceFile[];
+  /** Dernière analyse automatique du DCE (V1.3). */
+  analysis?: AnalysisResult;
+  /** Décisions du responsable sur les constats, conservées d'une analyse à l'autre. */
+  analysisDecisions: Record<string, FindingDecision>;
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -103,7 +109,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions'
 >;
 
 export interface AppSettings {

@@ -4,6 +4,10 @@ import { getFileStore } from '../data/fileStore';
 import { buildDemoFile } from '../data/demoFiles';
 import { categoryLabel, kindOf, syncDeclarations, validateUpload, type RejectedFile } from '../domain/documents';
 import { inspectFile } from '../lib/inspectFile';
+import { extractSheets, extractText } from '../lib/extractText';
+import { analyse } from '../domain/analysis/analyse';
+import { summarize } from '../domain/analysis/summary';
+import type { AnalysisResult, FindingStatus } from '../domain/analysis/types';
 import { LocalStudyRepository, type StudyRepository } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
@@ -39,6 +43,9 @@ interface StoreValue {
   removeDocument(studyId: string, docId: string, reason: string): Promise<void>;
   /** Contenu d'un fichier (généré à la volée pour la démonstration). */
   getFileBlob(doc: DceFile): Promise<Blob | null>;
+  /** Analyse automatique du DCE ; `onStep` reçoit chaque étape réalisée. */
+  runAnalysis(studyId: string, onStep?: (label: string) => void): Promise<AnalysisResult>;
+  decideFinding(studyId: string, findingId: string, status: FindingStatus, comment: string): void;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -62,7 +69,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       if (cancelled) return;
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [] })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {} })));
       loaded.current = true;
       setReady(true);
     })();
@@ -236,13 +243,61 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
           [{ field: 'Suppression DCE', oldValue: `${doc.name} (${categoryLabel(doc.category)})`, newValue: 'supprimé' }], reason);
       },
       getFileBlob,
+      async runAnalysis(studyId, onStep) {
+        const s = getStudy(studyId);
+        if (!s) throw new Error('Étude introuvable');
+        const texts: { doc: DceFile; pages: string[] }[] = [];
+        for (const d of s.documents.filter((x) => ['RC', 'CCAP', 'CCTP'].includes(x.category) && ['pdf', 'word', 'text'].includes(x.kind))) {
+          const blob = await getFileBlob(d);
+          if (!blob) continue;
+          const t = await extractText(blob, d).catch(() => ({ pages: [] as string[] }));
+          texts.push({ doc: d, pages: t.pages });
+          onStep?.(`Lecture ${categoryLabel(d.category)} (${t.pages.length} p.)`);
+        }
+        let dpgf: Parameters<typeof analyse>[0]['dpgf'];
+        const dd = s.documents.find((x) => x.category === 'DPGF' && x.kind === 'excel' && !/\.xls$/i.test(x.name));
+        if (dd) {
+          const blob = await getFileBlob(dd);
+          if (blob) {
+            const sheets = await extractSheets(blob, dd.name).catch(() => []);
+            dpgf = { doc: dd, sheets };
+          }
+          onStep?.('Lecture DPGF');
+        }
+        const result = analyse({ study: s, texts, dpgf, user: settings.userName });
+        onStep?.('Détection des prestations');
+        onStep?.('Comparaison CCTP / DPGF');
+        onStep?.('Repérage des clauses à risque');
+        const sum = summarize(result, s.analysisDecisions);
+        updateStudy(studyId, { analysis: result }, [{
+          field: 'Analyse du DCE',
+          oldValue: s.analysis ? `${summarize(s.analysis, s.analysisDecisions).critical} point(s) critique(s)` : '—',
+          newValue: `${sum.critical} critique(s), ${sum.toCheck} à vérifier, ${sum.questions} question(s)`,
+        }], 'Analyse automatique');
+        return result;
+      },
+      decideFinding(studyId, findingId, status, comment) {
+        const s = getStudy(studyId);
+        const f = s?.analysis?.findings.find((x) => x.id === findingId);
+        if (!s || !f) return;
+        const labels: Record<FindingStatus, string> = { ouvert: 'Ouvert', traite: 'Traité', ecarte: 'Écarté' };
+        const previous = s.analysisDecisions[findingId]?.status ?? 'ouvert';
+        const decisions = { ...s.analysisDecisions };
+        if (status === 'ouvert') delete decisions[findingId];
+        else decisions[findingId] = { status, comment, by: settings.userName, at: new Date().toISOString() };
+        updateStudy(studyId, { analysisDecisions: decisions },
+          [{ field: `Constat « ${f.title} »`, oldValue: labels[previous], newValue: labels[status] }], comment || 'Décision sur constat');
+      },
       updateSettings(patch) {
         setSettings((prev) => ({ ...prev, ...patch }));
       },
       resetDemo() {
+        // Les fichiers de démonstration seront régénérés (version à jour).
+        studies.filter((x) => x.isDemo).forEach((x) => x.documents.forEach((d) => void getFileStore().remove(d.id).catch(() => {})));
         setStudies((prev) => [...prev.filter((s) => !s.isDemo), ...buildDemoStudies(settings.userName)]);
       },
       removeDemo() {
+        studies.filter((x) => x.isDemo).forEach((x) => x.documents.forEach((d) => void getFileStore().remove(d.id).catch(() => {})));
         setStudies((prev) => prev.filter((s) => !s.isDemo));
       },
     };

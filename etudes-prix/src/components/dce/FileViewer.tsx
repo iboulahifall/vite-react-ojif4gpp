@@ -28,7 +28,7 @@ function Unreadable({ reason }: { reason: string }) {
 
 const toolBtn = 'rounded-md p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-40 cursor-pointer';
 
-function PdfViewer({ blob }: { blob: Blob }) {
+function PdfViewer({ blob, initialPage = 1 }: { blob: Blob; initialPage?: number }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [error, setError] = useState(false);
   const [page, setPage] = useState(1);
@@ -41,10 +41,15 @@ function PdfViewer({ blob }: { blob: Blob }) {
     let close: (() => Promise<void>) | null = null;
     setPdf(null); setError(false); setPage(1);
     openPdf(blob)
-      .then((r) => { if (closed) void r.close(); else { close = r.close; setPdf(r.doc); } })
+      .then((r) => {
+        if (closed) { void r.close(); return; }
+        close = r.close;
+        setPage(Math.min(Math.max(1, initialPage), r.doc.numPages));
+        setPdf(r.doc);
+      })
       .catch(() => !closed && setError(true));
     return () => { closed = true; void close?.(); };
-  }, [blob]);
+  }, [blob, initialPage]);
 
   useEffect(() => {
     if (!pdf || !canvas.current || !box.current) return;
@@ -252,9 +257,9 @@ function TextViewer({ blob }: { blob: Blob }) {
 }
 
 /** Aperçu d'un fichier du DCE selon son type. */
-export function FileViewer({ doc, blob }: { doc: DceFile; blob: Blob }) {
+export function FileViewer({ doc, blob, initialPage }: { doc: DceFile; blob: Blob; initialPage?: number }) {
   switch (doc.kind) {
-    case 'pdf': return <PdfViewer blob={blob} />;
+    case 'pdf': return <PdfViewer blob={blob} initialPage={initialPage} />;
     case 'excel': return <SpreadsheetViewer blob={blob} name={doc.name} />;
     case 'word': return <WordViewer blob={blob} name={doc.name} />;
     case 'image': return <ImageViewer blob={blob} />;
