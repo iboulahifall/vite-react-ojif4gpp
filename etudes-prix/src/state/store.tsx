@@ -23,6 +23,7 @@ import { LocalStudyRepository, type StudyRepository } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
 import { progressForStatus, stageOf } from '../domain/workflow';
+import { runReview as computeReview, scoreOf, type ReviewRecord } from '../domain/review';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   userName: 'Ibrahima',
@@ -101,6 +102,10 @@ interface StoreValue {
   /** Crée des questions (ou des risques) à partir des constats de l'analyse du DCE. */
   questionsFromFindings(studyId: string, findingIds: string[]): number;
   riskFromFinding(studyId: string, findingId: string): Risk | null;
+  /** Revue de prix (V1.8) : exécute les contrôles et enregistre le résultat. */
+  runReview(studyId: string): ReviewRecord | null;
+  /** Justifie un point « à vérifier » de la revue (motif obligatoire) ; `null` retire la justification. */
+  justifyCheck(studyId: string, checkId: string, reason: string | null): void;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -127,7 +132,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       setSuppliers(storedSuppliers ?? buildDemoSuppliers());
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage(), risks: st.risks ?? [], questions: st.questions ?? [] })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage(), risks: st.risks ?? [], questions: st.questions ?? [], reviewJustifications: st.reviewJustifications ?? {} })));
       loaded.current = true;
       setReady(true);
     })();
@@ -561,6 +566,24 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
         };
         updateStudy(studyId, (cur) => ({ risks: [...cur.risks, risk] }), [{ field: `Risque ${riskCode(risk)} créé`, oldValue: '—', newValue: `${risk.title} (depuis l’analyse)`, target: risk.id }], 'Import depuis l’analyse');
         return risk;
+      },
+      runReview(studyId) {
+        const s = getStudy(studyId);
+        if (!s) return null;
+        const rec = computeReview(s, settings.userName);
+        const fmt = (r: ReviewRecord) => { const sc = scoreOf(r.checks, s.reviewJustifications); return `${sc.score} % — ${sc.passed} réussi(s), ${sc.toCheck} à vérifier, ${sc.blocking} bloquant(s)`; };
+        updateStudy(studyId, { review: rec }, [{ field: 'Revue de prix', oldValue: s.review ? fmt(s.review) : '—', newValue: fmt(rec) }], s.review ? 'Nouvelle revue' : 'Première revue');
+        return rec;
+      },
+      justifyCheck(studyId, checkId, reason) {
+        const s = getStudy(studyId);
+        const c = s?.review?.checks.find((x) => x.id === checkId);
+        if (!s || !c) return;
+        const j = { ...s.reviewJustifications };
+        if (reason === null) delete j[checkId];
+        else j[checkId] = { reason, by: settings.userName, at: new Date().toISOString(), detail: c.detail };
+        updateStudy(studyId, { reviewJustifications: j }, [{ field: `Contrôle « ${c.label} »`, oldValue: reason === null ? 'Justifié' : 'À vérifier', newValue: reason === null ? 'À vérifier' : 'Justifié' }],
+          reason ?? 'Justification retirée');
       },
       async initMetre(studyId) {
         const s = getStudy(studyId);

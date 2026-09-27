@@ -6,6 +6,7 @@ import { dceSignature } from './analysis/analyse';
 import { metreSummary } from './metre';
 import { consultationSummary } from './consultations';
 import { buildUp } from './chiffrage';
+import { isReviewStale, scoreOf } from './review';
 import { isQuestionLate, isQuestionOpen, isRiskActive, questionCode, riskCode } from './risks';
 
 export interface Blocker {
@@ -77,6 +78,16 @@ export function studyBlockers(s: Study, today = new Date()): Blocker[] {
         .filter(Boolean).join(' · '),
       to: `${base}/questions`,
     });
+  }
+
+  // Revue de prix : à faire, à relancer ou non concluante (les causes sont listées ci-dessus).
+  if (s.status === 'revue' || s.status === 'validation') {
+    if (!s.review) out.push({ id: 'revue', level: 'important', label: 'Revue de prix à lancer', detail: 'Les contrôles de cohérence n’ont pas été exécutés.', to: `${base}/revue` });
+    else if (isReviewStale(s)) out.push({ id: 'revue', level: 'important', label: 'Revue de prix à relancer', detail: 'L’étude a changé depuis la dernière revue.', to: `${base}/revue` });
+    else {
+      const sc = scoreOf(s.review.checks, s.reviewJustifications ?? {});
+      if (sc.toCheck) out.push({ id: 'revue', level: 'important', label: `${sc.toCheck} point(s) de la revue à vérifier`, detail: 'À corriger, ou à justifier avec un motif.', to: `${base}/revue?filtre=verifier` });
+    }
   }
 
   const order = { critique: 0, important: 1 };

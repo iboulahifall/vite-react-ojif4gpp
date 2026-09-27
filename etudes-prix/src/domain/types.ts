@@ -44,6 +44,7 @@ import type { MetreLine } from './metre';
 import type { Consultation } from './consultations';
 import type { Chiffrage } from './chiffrage';
 import type { Question, Risk } from './risks';
+import type { ReviewJustification, ReviewRecord } from './review';
 
 export interface DceDocDeclaration {
   type: DceDocType;
@@ -112,6 +113,9 @@ export interface Study {
   /** Risques et questions au maître d'ouvrage (V1.7). */
   risks: Risk[];
   questions: Question[];
+  /** Dernière revue de prix (V1.8) et justifications des points « à vérifier ». */
+  review?: ReviewRecord;
+  reviewJustifications: Record<string, ReviewJustification>;
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -124,7 +128,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage' | 'risks' | 'questions'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage' | 'risks' | 'questions' | 'review' | 'reviewJustifications'
 >;
 
 export interface AppSettings {

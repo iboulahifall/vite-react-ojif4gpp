@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.7
+# Études de Prix CFO/CFA — V1.8
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -123,8 +123,23 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
   bloquantes), chacun menant à la page où le traiter. Barre des modules avec l'état de chacun.
 - Risques critiques et questions ouvertes sont calculés automatiquement (tableau de bord, alertes, prochaine action).
 
-Les modules Revue, Validation et Rapports
-sont visibles dans le menu avec leur version prévue (V1.8 à V1.10).
+## Contenu de la V1.8 — Revue de prix
+
+- **Lancer la revue** : une trentaine de contrôles de cohérence, en six familles (analyse CCTP, analyse DPGF,
+  pièces et plans, quantités, prix, risques), déroulés à l’écran.
+- **Anomalies détectées** : points critiques de l’analyse non traités, questions proposées non posées, lignes non rattachées
+  ou hors périmètre, familles sans ligne, pièces manquantes, quantités à établir / non validées / nulles, écarts > 10 %
+  sans commentaire, prix manquants, estimés ou à confirmer, déboursés unitaires hors norme (×3 par rapport à la base
+  indicative), fourniture sans pose, marge et taux horaire hors plage, écart avec le montant estimé, offres en attente,
+  non reportées ou expirant avant la remise, risques critiques, provision inférieure à l’exposition, questions bloquantes, délai.
+- Chaque contrôle est 🔴 **bloquant**, 🟠 **à vérifier** ou 🟢 **réussi**, avec les éléments concernés et un bouton
+  **Corriger** vers la page où agir. Un point à vérifier peut être **justifié** (motif obligatoire, tracé) ; la justification
+  tombe si le constat change.
+- **Score de contrôle** (réussis + justifiés / contrôles applicables) : il indique l’état des contrôles de l’application,
+  ce n’est **pas une garantie de conformité**. Revue **périmée** signalée dès que l’étude change ; passage à la
+  validation impossible tant qu’un contrôle est bloquant. Rapport de revue imprimable.
+
+Les modules Validation et Rapports sont visibles dans le menu avec leur version prévue (V1.9 et V1.10).
 
 ## Architecture
 

@@ -98,6 +98,7 @@ export function buildDemoStudies(owner: string, today = new Date()): Study[] {
       metre: seed.withFiles ? buildDemoMetre(`demo-${i + 1}`, owner, iso) : [],
       consultations: seed.withFiles ? buildDemoConsultations(`demo-${i + 1}`, owner, today) : [],
       chiffrage: emptyChiffrage(),
+      reviewJustifications: {},
       ...(seed.withFiles ? buildDemoFollowUp(`demo-${i + 1}`, owner, today) : { risks: [], questions: [] }),
       plan,
       indicators: { criticalRisks: seed.critical ?? 0, openQuestions: seed.questions ?? 0, pendingPrices: seed.pending ?? 0 },

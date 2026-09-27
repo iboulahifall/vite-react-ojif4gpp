@@ -27,8 +27,7 @@ export const MODULE_NAV: NavItem[] = [
   { to: '/chiffrage', label: 'Chiffrage', icon: Calculator },
   { to: '/risques', label: 'Risques', icon: AlertTriangle },
   { to: '/questions', label: 'Questions', icon: HelpCircle },
-  { to: '/modules/revue', label: 'Revue de prix', icon: SearchCheck, version: 'V1.8',
-    description: 'Lancer les contrôles de cohérence et afficher les anomalies avant validation.' },
+  { to: '/revue', label: 'Revue de prix', icon: SearchCheck },
   { to: '/modules/rapports', label: 'Rapports', icon: Printer, version: 'V1.10',
     description: 'Générer le rapport PDF complet, la synthèse réunion et l’export Excel du chiffrage.' },
 ];

@@ -57,6 +57,7 @@ export function createStudyFromDraft(draft: StudyDraft, user: string, now = new 
     chiffrage: emptyChiffrage(),
     risks: [],
     questions: [],
+    reviewJustifications: {},
     status: 'analyse',
     progress: 5,
     isDemo: false,

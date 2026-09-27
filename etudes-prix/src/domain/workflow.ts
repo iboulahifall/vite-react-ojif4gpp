@@ -6,6 +6,7 @@ import { metreSummary } from './metre';
 import { consultationSummary } from './consultations';
 import { buildUp } from './chiffrage';
 import { isQuestionLate, riskSummary } from './risks';
+import { isReviewStale, scoreOf } from './review';
 
 export interface StageInfo {
   id: StudyStatus;
@@ -30,7 +31,7 @@ export const STAGES: StageInfo[] = [
     todo: 'Consulter fournisseurs et sous-traitants, relancer, comparer les offres.' },
   { id: 'chiffrage', label: 'Chiffrage', short: 'Chiffrage', minProgress: 55, module: 'V1.6', delivered: true,
     todo: 'Calculer le déboursé sec, intégrer la main-d’œuvre et les frais, fixer le prix de vente.' },
-  { id: 'revue', label: 'Revue de prix', short: 'Revue', minProgress: 75, module: 'V1.8', delivered: false,
+  { id: 'revue', label: 'Revue de prix', short: 'Revue', minProgress: 75, module: 'V1.8', delivered: true,
     todo: 'Contrôler la cohérence du chiffrage : quantités, prix, risques, oublis.' },
   { id: 'validation', label: 'Validation', short: 'Validation', minProgress: 90, module: 'V1.9', delivered: false,
     todo: 'Valider l’étude avec la direction et préparer le dossier de remise.' },
@@ -141,7 +142,14 @@ export function nextAction(study: Study, today = new Date()): NextAction {
     case 'metre': return { label: 'Métrer', tone: 'info', reason: stageOf('metre').todo };
     case 'consultation': return { label: 'Comparer les offres', tone: 'info', reason: stageOf('consultation').todo };
     case 'chiffrage': return { label: 'Chiffrer', tone: 'info', reason: stageOf('chiffrage').todo };
-    case 'revue': return { label: 'Faire la revue', tone: 'info', reason: stageOf('revue').todo };
+    case 'revue': {
+      if (!study.review) return { label: 'Lancer la revue', tone: 'info', reason: 'Contrôlez la cohérence du chiffrage avant la validation.' };
+      if (isReviewStale(study)) return { label: 'Relancer la revue', tone: 'warning', reason: 'L’étude a changé depuis la dernière revue.' };
+      const sc = scoreOf(study.review.checks, study.reviewJustifications ?? {});
+      if (sc.blocking) return { label: 'Corriger les anomalies', tone: 'danger', reason: `${sc.blocking} contrôle(s) bloquant(s) dans la revue de prix.` };
+      if (sc.toCheck) return { label: 'Traiter les points à vérifier', tone: 'warning', reason: `${sc.toCheck} point(s) de la revue à corriger ou à justifier.` };
+      return { label: 'Passer à la validation', tone: 'success', reason: `Revue de prix terminée (${sc.score} %).` };
+    }
     case 'validation': return { label: 'Valider', tone: 'success', reason: 'L’étude est prête à être validée.' };
   }
 }
