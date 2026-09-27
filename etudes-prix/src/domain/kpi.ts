@@ -2,6 +2,7 @@ import type { RiskLevel, Study, StudyStatus } from './types';
 import { STAGES, isActive, nextAction, RISK_ORDER } from './workflow';
 import { daysUntil } from './dates';
 import { consultationSummary } from './consultations';
+import { buildUp } from './chiffrage';
 import { missingDocs } from './catalog';
 
 /**
@@ -17,6 +18,15 @@ export function pendingPricesOf(s: Study, today = new Date()): number {
 /** Demandes de prix sans réponse après la date attendue. */
 export function lateRequestsOf(s: Study, today = new Date()): number {
   return s.consultations?.length ? consultationSummary(s.consultations, today).late : 0;
+}
+
+/** Montant d'une étude : prix de vente chiffré s'il existe, sinon montant estimé. */
+export function amountOf(s: Study): number {
+  if (s.chiffrage?.lines.length) {
+    const pv = buildUp(s.metre, s.chiffrage).salePrice;
+    if (pv > 0) return pv;
+  }
+  return s.estimatedAmount;
 }
 
 export interface DashboardKpis {
@@ -47,7 +57,7 @@ export function computeKpis(studies: Study[], today = new Date()): DashboardKpis
     activeCount: active.length,
     dueSoonCount: active.filter((s) => isDueSoon(s, today)).length,
     overdueCount: active.filter((s) => isOverdue(s, today)).length,
-    activeAmount: active.reduce((sum, s) => sum + s.estimatedAmount, 0),
+    activeAmount: active.reduce((sum, s) => sum + amountOf(s), 0),
     criticalRisks: active.reduce((sum, s) => sum + s.indicators.criticalRisks, 0),
     pendingPrices: active.reduce((sum, s) => sum + pendingPricesOf(s, today), 0),
     readyToValidate: active.filter((s) => s.status === 'validation').length,

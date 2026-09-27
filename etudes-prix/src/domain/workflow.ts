@@ -4,6 +4,7 @@ import { missingDocs } from './catalog';
 import { summarize } from './analysis/summary';
 import { metreSummary } from './metre';
 import { consultationSummary } from './consultations';
+import { buildUp } from './chiffrage';
 
 export interface StageInfo {
   id: StudyStatus;
@@ -117,6 +118,12 @@ export function nextAction(study: Study, today = new Date()): NextAction {
     : study.indicators.pendingPrices;
   if ((study.status === 'consultation' || study.status === 'chiffrage') && pending > 0) {
     return { label: 'Relancer', tone: 'warning', reason: `${pending} prix fournisseur(s) en attente.` };
+  }
+  if (study.status === 'chiffrage') {
+    const b = buildUp(study.metre, study.chiffrage);
+    if (!study.chiffrage.lines.length) return { label: 'Chiffrer', tone: 'info', reason: 'Aucun prix saisi : pré-remplissez avec la base de prix et reportez les offres retenues.' };
+    if (b.missing > 0) return { label: 'Compléter les prix', tone: 'warning', reason: `${b.missing} ligne(s) sans prix.` };
+    if (b.toConfirm + b.estimated > 0) return { label: 'Confirmer les prix', tone: 'info', reason: `${b.toConfirm} prix à confirmer et ${b.estimated} prix estimé(s).` };
   }
   if (study.indicators.criticalRisks > 0 && (study.status === 'revue' || study.status === 'validation')) {
     return { label: 'Traiter les risques', tone: 'danger', reason: `${study.indicators.criticalRisks} risque(s) critique(s) avant validation.` };

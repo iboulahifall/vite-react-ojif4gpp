@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlarmClock, AlertOctagon, BarChart3, CheckCircle2, Euro, Flame, FolderOpen, Hourglass, ListChecks, Plus, Printer } from 'lucide-react';
 import { useStore } from '../state/store';
-import { computeAlerts, computeKpis, countByStatus, sortByPriority } from '../domain/kpi';
+import { amountOf, computeAlerts, computeKpis, countByStatus, sortByPriority } from '../domain/kpi';
 import { formatEuro, formatEuroCompact } from '../domain/format';
 import { nextAction, stageOf } from '../domain/workflow';
 import { KpiCard } from '../components/KpiCard';
@@ -61,9 +61,9 @@ export function DashboardPage() {
           hint={`${kpis.readyToValidate} prête(s) à valider`} />
         <KpiCard label="Échéances < 7 jours" value={kpis.dueSoonCount} icon={<AlarmClock size={18} />} tone="amber" to="/etudes?filtre=echeance"
           hint={kpis.overdueCount > 0 ? <span className="font-semibold text-red-700">⛔ {kpis.overdueCount} en retard</span> : 'Aucune en retard'} />
-        <KpiCard label="Montant estimé" value={formatEuroCompact(kpis.activeAmount)} icon={<Euro size={18} />} tone="emerald" to="/etudes?statut=en-cours"
+        <KpiCard label="Montant chiffré" value={formatEuroCompact(kpis.activeAmount)} icon={<Euro size={18} />} tone="emerald" to="/etudes?statut=en-cours"
           hint="Total HT des études en cours"
-          help="Somme des montants estimés (HT) des études non encore remises. Le montant réellement chiffré sera calculé par le module Chiffrage (V1.6)." />
+          help="Somme des prix de vente HT des études en cours : prix chiffré quand le chiffrage existe, sinon montant estimé à la création." />
         <KpiCard label="Risques critiques" value={kpis.criticalRisks} icon={<AlertOctagon size={18} />} tone="red" to="/etudes?filtre=risque"
           hint="Sur l’ensemble des études"
           help="Nombre de risques jugés critiques (financiers ou techniques). En V1.1, ce nombre est saisi sur chaque étude ; il sera alimenté par le module Risques (V1.7)." />
@@ -131,7 +131,7 @@ export function DashboardPage() {
                       <span className="font-semibold text-slate-900">{s.name}</span>
                       {s.isDemo && <DemoBadge />}
                     </div>
-                    <div className="text-xs text-slate-500">{s.reference} · {s.client} · {formatEuro(s.estimatedAmount)}</div>
+                    <div className="text-xs text-slate-500">{s.reference} · {s.client} · {formatEuro(amountOf(s))}</div>
                   </td>
                   <td className="px-3 py-3"><DueDate iso={s.dueDate} /></td>
                   <td className="px-3 py-3"><StatusBadge status={s.status} /></td>
@@ -174,7 +174,7 @@ export function DashboardPage() {
               stageOf(s.status).label,
               `${s.progress} %`,
               RISK_LABELS[s.riskLevel],
-              formatEuro(s.estimatedAmount),
+              formatEuro(amountOf(s)),
               nextAction(s).label,
             ])}
             foot={['', 'Total', '', '', '', '', formatEuro(kpis.activeAmount), '']}

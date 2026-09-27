@@ -18,6 +18,8 @@ import { ConsultationPage } from './pages/ConsultationPage';
 import { ConsultationsIndexPage } from './pages/ConsultationsIndexPage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierPage } from './pages/SupplierPage';
+import { ChiffragePage } from './pages/ChiffragePage';
+import { ChiffrageIndexPage } from './pages/ChiffrageIndexPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -41,6 +43,8 @@ function Routed() {
         <Route path="consultations" element={<ConsultationsIndexPage />} />
         <Route path="fournisseurs" element={<SuppliersPage />} />
         <Route path="fournisseurs/:sid" element={<SupplierPage />} />
+        <Route path="etudes/:id/chiffrage" element={<ChiffragePage />} />
+        <Route path="chiffrage" element={<ChiffrageIndexPage />} />
         <Route path="nouvelle-etude" element={<NewStudyPage />} />
         <Route path="modules/:module" element={<ModulePage />} />
         <Route path="parametres" element={<SettingsPage />} />

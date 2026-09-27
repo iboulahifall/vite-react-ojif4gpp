@@ -2,6 +2,7 @@ import type { DceDocDeclaration, Lot, Study, StudyDraft } from './types';
 import { DCE_DOCS, familiesOfLots } from './catalog';
 import { addDays, toISODate } from './dates';
 import { generatePlan } from './planning';
+import { emptyChiffrage } from './chiffrage';
 
 export function newId(prefix = 'id'): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -53,6 +54,7 @@ export function createStudyFromDraft(draft: StudyDraft, user: string, now = new 
     analysisDecisions: {},
     metre: [],
     consultations: [],
+    chiffrage: emptyChiffrage(),
     status: 'analyse',
     progress: 5,
     isDemo: false,

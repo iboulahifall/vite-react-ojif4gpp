@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generatePlan, isPlanTight } from './planning';
-import { computeAlerts, computeKpis, countByStatus, sortByPriority } from './kpi';
+import { amountOf, computeAlerts, computeKpis, countByStatus, sortByPriority } from './kpi';
 import { nextAction, nextStatus, previousStatus, progressForStatus } from './workflow';
 import { createStudyFromDraft, emptyDraft, nextReference, validateProjectStep } from './studyFactory';
 import { preAnalyse } from './preAnalysis';
@@ -57,6 +57,13 @@ describe('workflow', () => {
     const a = nextAction({ ...demo, status: 'consultation' }, TODAY);
     expect(a.label).toBe('Relancer');
     expect(a.reason).toMatch(/sans réponse/);
+  });
+
+  it('au chiffrage : chiffrer, compléter puis confirmer les prix', () => {
+    expect(nextAction(study({ dueDate: '2026-10-20', status: 'chiffrage' }), TODAY).label).toBe('Chiffrer');
+    const d0 = buildDemoStudies('T', TODAY)[0];
+    const demo = { ...d0, consultations: [], indicators: { ...d0.indicators, pendingPrices: 0 } };
+    expect(nextAction({ ...demo, status: 'chiffrage' }, TODAY)).toMatchObject({ label: 'Compléter les prix', reason: '1 ligne(s) sans prix.' });
   });
 
   it('au métré : créer, puis valider les quantités', () => {
@@ -119,7 +126,9 @@ describe('tableau de bord', () => {
     const active = studies.filter((s) => s.status !== 'remise');
     expect(k.activeCount).toBe(active.length);
     expect(k.activeCount).toBe(12);
-    expect(k.activeAmount).toBe(active.reduce((t, s) => t + s.estimatedAmount, 0));
+    expect(k.activeAmount).toBe(active.reduce((t, s) => t + amountOf(s), 0));
+    expect(amountOf(studies[0])).toBeGreaterThan(studies[0].estimatedAmount); // prix de vente chiffré
+    expect(amountOf(studies[1])).toBe(studies[1].estimatedAmount);
     expect(k.overdueCount).toBe(1);
     expect(k.dueSoonCount).toBe(4); // J-2, J-4, J-5, J-6
     expect(k.readyToValidate).toBe(1);

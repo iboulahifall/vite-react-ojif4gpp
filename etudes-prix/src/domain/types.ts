@@ -42,6 +42,7 @@ export interface DceFile {
 import type { AnalysisResult, FindingDecision } from './analysis/types';
 import type { MetreLine } from './metre';
 import type { Consultation } from './consultations';
+import type { Chiffrage } from './chiffrage';
 
 export interface DceDocDeclaration {
   type: DceDocType;
@@ -105,6 +106,8 @@ export interface Study {
   metre: MetreLine[];
   /** Consultations fournisseurs et sous-traitants (V1.5). */
   consultations: Consultation[];
+  /** Chiffrage : prix des lignes du métré et paramètres de vente (V1.6). */
+  chiffrage: Chiffrage;
   plan: PlanTask[];
   indicators: StudyIndicators;
   notes: string;
@@ -117,7 +120,7 @@ export interface Study {
 /** Données saisies dans l'assistant « Nouvelle étude ». */
 export type StudyDraft = Omit<
   Study,
-  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations'
+  'id' | 'status' | 'progress' | 'isDemo' | 'createdAt' | 'updatedAt' | 'history' | 'documents' | 'analysis' | 'analysisDecisions' | 'metre' | 'consultations' | 'chiffrage'
 >;
 
 export interface AppSettings {

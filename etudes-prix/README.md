@@ -1,4 +1,4 @@
-# Études de Prix CFO/CFA — V1.5
+# Études de Prix CFO/CFA — V1.6
 
 Application de pilotage des études de prix électricité (courants forts / courants faibles).
 
@@ -94,8 +94,23 @@ Il peut être réinitialisé ou supprimé depuis **Paramètres**.
   n'est pas la moins chère). Impression du suivi et de chaque consultation.
 - Les **prix en attente** et les **fournisseurs à relancer** alimentent le tableau de bord et la prochaine action.
 
-Les modules Chiffrage, Risques, Questions, Revue et Rapports
-sont visibles dans le menu avec leur version prévue (V1.6 à V1.10).
+## Contenu de la V1.6 — Chiffrage
+
+- **Déboursé sec** par ligne du métré : fourniture (€/u) + main-d'œuvre (h/u × taux horaire) + sous-traitance (€/u).
+- **Prix de revient** = déboursé sec + frais de chantier + frais généraux + aléas ; **prix de vente** = prix de revient
+  + marge (en % du prix de vente), ou **prix de vente visé** → marge calculée. Coefficient de vente affiché.
+- **Tableau de chiffrage** groupé par famille (Qté, PU, Matériel, MO, ST, Total, Prix de vente, Source) : recherche,
+  filtres, tri, sous-totaux, totaux ; le prix de vente est réparti sur chaque ligne (la somme redonne le total).
+- **Trace du prix** (clic sur une ligne) : origine, fournisseur, référence, prix catalogue, remise, prix retenu,
+  document, statut (🟢 confirmé, 🟠 à confirmer, 🟡 estimé, 🔴 manquant), commentaire, historique.
+- **Report des offres retenues** des consultations (prix unitaires ou forfait) ; **base de prix indicative** pour
+  pré-remplir les lignes sans prix (marquées « estimé »). Un prix confirmé à la main n'est jamais écrasé.
+- Toute modification importante (prix confirmé, écart ≥ 1 000 €, paramètres) est confirmée avec son impact sur
+  le prix de vente et tracée. **Export Excel** (détail + récapitulatif) et impression.
+- Le tableau de bord et les listes affichent le prix de vente chiffré (sinon le montant estimé).
+
+Les modules Risques, Questions, Revue et Rapports
+sont visibles dans le menu avec leur version prévue (V1.7 à V1.10).
 
 ## Architecture
 

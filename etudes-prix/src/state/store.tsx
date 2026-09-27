@@ -15,6 +15,8 @@ import { STATUS_LABELS, offerTotal, type Consultation, type Offer, type OfferFil
 import { buildDemoSuppliers } from '../data/demoConsultations';
 import { formatEuro } from '../domain/format';
 import { toISODate } from '../domain/dates';
+import { buildUp, emptyChiffrage, lineCost, type PriceLine, type PricingParams } from '../domain/chiffrage';
+import { baseLineFor, importRetainedOffers, type OfferImport } from '../domain/priceBase';
 import { LocalStudyRepository, type StudyRepository } from '../data/repository';
 import { buildDemoStudies } from '../data/demo';
 import { createStudyFromDraft, newId } from '../domain/studyFactory';
@@ -80,6 +82,11 @@ interface StoreValue {
   retainOffer(studyId: string, cid: string, rid: string | null, reason: string): void;
   addOfferFiles(studyId: string, cid: string, rid: string, files: File[]): Promise<{ added: number; rejected: RejectedFile[] }>;
   getBlob(id: string): Promise<Blob | null>;
+  /** Chiffrage (V1.6). */
+  updatePriceLine(studyId: string, metreLineId: string, patch: Partial<Omit<PriceLine, 'metreLineId'>>, reason: string): void;
+  setPricingParams(studyId: string, params: PricingParams, reason: string): void;
+  applyBasePrices(studyId: string): number;
+  importOffers(studyId: string): OfferImport;
   updateSettings(patch: Partial<AppSettings>): void;
   resetDemo(): void;
   removeDemo(): void;
@@ -106,7 +113,7 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
       setSuppliers(storedSuppliers ?? buildDemoSuppliers());
       setSettings(s);
       // Données enregistrées par une version antérieure : champs ajoutés depuis.
-      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [] })));
+      setStudies((stored ?? buildDemoStudies(s.userName)).map((st) => ({ ...st, documents: st.documents ?? [], analysisDecisions: st.analysisDecisions ?? {}, metre: st.metre ?? [], consultations: st.consultations ?? [], chiffrage: st.chiffrage ?? emptyChiffrage() })));
       loaded.current = true;
       setReady(true);
     })();
@@ -387,6 +394,61 @@ export function StoreProvider({ children, repository }: { children: ReactNode; r
         return { added: added.length, rejected };
       },
       getBlob: (id) => getFileStore().get(id),
+      updatePriceLine(studyId, metreLineId, patch, reason) {
+        const s = getStudy(studyId);
+        const m = s?.metre.find((x) => x.id === metreLineId);
+        if (!s || !m) return;
+        const prev = s.chiffrage.lines.find((l) => l.metreLineId === metreLineId);
+        const next: PriceLine = { metreLineId, materialUnit: null, laborHoursUnit: null, subcontractUnit: null, source: { kind: 'estimation', status: 'estime' }, comment: '', ...prev, ...patch };
+        const before = lineCost(m, prev, s.chiffrage.params).total;
+        const after = lineCost(m, next, s.chiffrage.params).total;
+        const changes: TrackedChange[] = [];
+        if (before !== after) changes.push({ field: `Prix ${m.ref || m.designation}`, oldValue: formatEuro(before), newValue: formatEuro(after), target: `prix:${metreLineId}` });
+        if (patch.source && JSON.stringify(patch.source) !== JSON.stringify(prev?.source)) {
+          changes.push({ field: `Source du prix ${m.ref || m.designation}`, oldValue: prev ? prev.source.status : '—', newValue: next.source.status, target: `prix:${metreLineId}` });
+        }
+        if (patch.comment !== undefined && patch.comment !== (prev?.comment ?? '')) changes.push({ field: `Commentaire prix ${m.ref || m.designation}`, oldValue: prev?.comment || '—', newValue: patch.comment || '—', target: `prix:${metreLineId}` });
+        if (!changes.length) return;
+        updateStudy(studyId, (cur) => ({
+          chiffrage: { ...cur.chiffrage, lines: [...cur.chiffrage.lines.filter((l) => l.metreLineId !== metreLineId), next] },
+        }), changes, reason);
+      },
+      setPricingParams(studyId, params, reason) {
+        const s = getStudy(studyId);
+        if (!s) return;
+        const labels: Record<keyof PricingParams, string> = { hourlyRate: 'Taux horaire', siteCostsPct: 'Frais de chantier', overheadPct: 'Frais généraux', riskPct: 'Aléas', marginPct: 'Marge' };
+        const unit = (k: keyof PricingParams) => (k === 'hourlyRate' ? ' €/h' : ' %');
+        const changes: TrackedChange[] = (Object.keys(labels) as (keyof PricingParams)[])
+          .filter((k) => params[k] !== s.chiffrage.params[k])
+          .map((k) => ({ field: `Chiffrage — ${labels[k]}`, oldValue: `${s.chiffrage.params[k]}${unit(k)}`, newValue: `${params[k]}${unit(k)}` }));
+        if (!changes.length) return;
+        const pvBefore = buildUp(s.metre, s.chiffrage).salePrice;
+        const pvAfter = buildUp(s.metre, { ...s.chiffrage, params }).salePrice;
+        changes.push({ field: 'Prix de vente', oldValue: formatEuro(pvBefore), newValue: formatEuro(pvAfter) });
+        updateStudy(studyId, (cur) => ({ chiffrage: { ...cur.chiffrage, params } }), changes, reason);
+      },
+      applyBasePrices(studyId) {
+        const s = getStudy(studyId);
+        if (!s) return 0;
+        const added = s.metre.filter((m) => !m.removedFromDpgf && !s.chiffrage.lines.some((l) => l.metreLineId === m.id)).map(baseLineFor).filter((l): l is PriceLine => l !== null);
+        if (added.length) {
+          updateStudy(studyId, (cur) => ({ chiffrage: { ...cur.chiffrage, lines: [...cur.chiffrage.lines, ...added.filter((a) => !cur.chiffrage.lines.some((l) => l.metreLineId === a.metreLineId))] } }),
+            [{ field: 'Chiffrage', oldValue: '—', newValue: `${added.length} ligne(s) pré-remplie(s) avec la base de prix (estimés)` }], 'Base de prix');
+        }
+        return added.length;
+      },
+      importOffers(studyId) {
+        const s = getStudy(studyId);
+        if (!s) return { lines: [], applied: 0, kept: [] };
+        const res = importRetainedOffers(s.consultations, s.metre, s.chiffrage.lines);
+        if (res.applied) {
+          const pvBefore = buildUp(s.metre, s.chiffrage).salePrice;
+          const pvAfter = buildUp(s.metre, { ...s.chiffrage, lines: res.lines }).salePrice;
+          updateStudy(studyId, (cur) => ({ chiffrage: { ...cur.chiffrage, lines: res.lines } }),
+            [{ field: 'Chiffrage — offres retenues', oldValue: formatEuro(pvBefore), newValue: `${formatEuro(pvAfter)} (${res.applied} ligne(s) mise(s) à jour)` }], 'Report des offres retenues');
+        }
+        return res;
+      },
       async initMetre(studyId) {
         const s = getStudy(studyId);
         if (!s) throw new Error('Étude introuvable');

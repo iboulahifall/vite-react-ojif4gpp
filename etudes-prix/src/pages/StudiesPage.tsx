@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, FolderOpen, Plus, Printer, Search, X }
 import { useStore } from '../state/store';
 import type { Study } from '../domain/types';
 import { STAGES, isActive, nextAction, stageIndex, stageOf, RISK_ORDER } from '../domain/workflow';
-import { isDueSoon, isOverdue } from '../domain/kpi';
+import { amountOf, isDueSoon, isOverdue } from '../domain/kpi';
 import { formatDate, formatEuro } from '../domain/format';
 import { RISK_LABELS } from '../domain/catalog';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -34,7 +34,7 @@ const COMPARE: Record<SortKey, (a: Study, b: Study) => number> = {
   status: (a, b) => stageIndex(a.status) - stageIndex(b.status),
   progress: (a, b) => a.progress - b.progress,
   risk: (a, b) => RISK_ORDER.indexOf(a.riskLevel) - RISK_ORDER.indexOf(b.riskLevel),
-  amount: (a, b) => a.estimatedAmount - b.estimatedAmount,
+  amount: (a, b) => amountOf(a) - amountOf(b),
 };
 
 export function StudiesPage() {
@@ -62,7 +62,7 @@ export function StudiesPage() {
       .sort((a, b) => COMPARE[sort](a, b) * dir);
   }, [studies, q, statut, filtre, sort, dir]);
 
-  const total = rows.reduce((t, s) => t + s.estimatedAmount, 0);
+  const total = rows.reduce((t, s) => t + amountOf(s), 0);
 
   const header = (key: SortKey, label: string, className?: string) => {
     const active = sort === key;
@@ -159,7 +159,7 @@ export function StudiesPage() {
                   <td className="px-3 py-3"><StatusBadge status={s.status} /></td>
                   <td className="px-3 py-3"><ProgressBar value={s.progress} size="sm" /></td>
                   <td className="px-3 py-3"><RiskBadge level={s.riskLevel} /></td>
-                  <td className="px-3 py-3 text-right tabular font-medium">{formatEuro(s.estimatedAmount)}</td>
+                  <td className="px-3 py-3 text-right tabular font-medium" title={s.chiffrage.lines.length ? 'Prix de vente chiffré' : 'Montant estimé'}>{formatEuro(amountOf(s))}{!s.chiffrage.lines.length && <span className="ml-0.5 text-slate-400">*</span>}</td>
                   <td className="px-5 py-3"><NextActionPill action={nextAction(s)} /></td>
                 </tr>
               ))}
@@ -179,6 +179,7 @@ export function StudiesPage() {
             )}
           </table>
         </div>
+        <p className="border-t border-slate-100 px-5 py-2 text-xs text-slate-500">Montant : prix de vente chiffré ; <span className="text-slate-400">*</span> montant estimé (étude pas encore chiffrée).</p>
       </Card>
 
       <PrintDocument title="Liste des études" demo={rows.some((s) => s.isDemo)}>
@@ -187,7 +188,7 @@ export function StudiesPage() {
             head={['Réf.', 'Projet / client', 'Remise', 'Étape', 'Av.', 'Risque', 'Montant HT', 'Responsable']}
             align={['left', 'left', 'left', 'left', 'right', 'left', 'right', 'left']}
             rows={rows.map((s) => [s.reference, <><strong>{s.name}</strong><br />{s.client}</>, formatDate(s.dueDate), stageOf(s.status).label,
-              `${s.progress} %`, RISK_LABELS[s.riskLevel], formatEuro(s.estimatedAmount), s.owner])}
+              `${s.progress} %`, RISK_LABELS[s.riskLevel], formatEuro(amountOf(s)), s.owner])}
             foot={['', 'Total', '', '', '', '', formatEuro(total), '']}
           />
         </PrintSection>
