@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-ink: #0f172a;
+  --color-canvas: #f4f6fa;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tableaux : en-têtes fixes et chiffres alignés. */
+.table-sticky thead th { position: sticky; top: 0; z-index: 1; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ---------- Impression ---------- */
+.print-only { display: none; }
+
+@page {
+  size: A4;
+  margin: 18mm 14mm 20mm 14mm;
+  @bottom-right { content: "Page " counter(page) " / " counter(pages); font: 9pt sans-serif; color: #475569; }
+}
+
+@media print {
+  html, body, #root { height: auto; background: #fff !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  .print-break-before { break-before: page; page-break-before: always; }
+  table { page-break-inside: auto; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
