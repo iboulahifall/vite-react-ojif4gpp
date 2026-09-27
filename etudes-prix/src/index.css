@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-ink: #0f172a;
+  --color-canvas: #f4f6fa;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tableaux : en-têtes fixes et chiffres alignés. */
+.table-sticky thead th { position: sticky; top: 0; z-index: 1; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ---------- Impression ---------- */
+.print-only { display: none; }
+
+/* Rapport : aperçu « feuille A4 » à l'écran, mise en page normale à l'impression. */
+.report-first > section { break-before: auto !important; page-break-before: auto !important; }
+@media screen {
+  .report-sheet { width: 210mm; max-width: 100%; margin: 0 auto; padding: 14mm; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.06); border-radius: 4px; }
+  .report-sheet .print-break-before { border-top: 2px dashed #cbd5e1; margin-top: 10mm; padding-top: 10mm; }
+  .report-sheet .report-first > section { border-top: 0; margin-top: 0; padding-top: 0; }
+  .report-cover { min-height: 230mm; }
+}
+
+@page {
+  size: A4;
+  margin: 18mm 14mm 20mm 14mm;
+  @bottom-right { content: "Page " counter(page) " / " counter(pages); font: 9pt sans-serif; color: #475569; }
+}
+
+@media print {
+  html, body, #root { height: auto; background: #fff !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  .print-break-before { break-before: page; page-break-before: always; }
+  .report-cover { height: 250mm; }
+  table { page-break-inside: auto; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Aperçu des documents Word importés */
+.word-preview h1 { font-size: 1.4em; font-weight: 700; margin: 0.8em 0 0.4em; }
+.word-preview h2 { font-size: 1.2em; font-weight: 700; margin: 0.8em 0 0.4em; }
+.word-preview h3 { font-weight: 700; margin: 0.6em 0 0.3em; }
+.word-preview p { margin: 0.4em 0; }
+.word-preview ul { list-style: disc; padding-left: 1.5em; }
+.word-preview ol { list-style: decimal; padding-left: 1.5em; }
+.word-preview table { border-collapse: collapse; margin: 0.6em 0; }
+.word-preview td, .word-preview th { border: 1px solid #cbd5e1; padding: 2px 6px; }
+.word-preview a { color: #1d4ed8; text-decoration: underline; }

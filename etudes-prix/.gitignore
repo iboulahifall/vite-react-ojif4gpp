@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+*.tsbuildinfo
+backend/data/
+__pycache__/
+.pytest_cache/
