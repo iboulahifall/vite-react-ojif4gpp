@@ -164,6 +164,33 @@ async function initFlight() {
   const poster = $('.flight__poster');
   let drawn = -1, target = 0, lastFrame = 0, dir = 1, raf = 0;
 
+  // ── Vidéo d'entrée (défilement dans une vidéo, repli sur les images si elle échoue) ──
+  const iv = media.introVideo;
+  const video = iv ? document.createElement('video') : null;
+  let videoOK = false, videoPending = null, videoOpacity = 0;
+  if (video) {
+    Object.assign(video, { muted: true, playsInline: true, preload: 'auto', src: iv.url, poster: media.stills.arrivee });
+    video.className = 'flight__video';
+    video.setAttribute('aria-hidden', 'true');
+    video.disablePictureInPicture = true;
+    canvas.after(video);
+    video.addEventListener('loadeddata', () => { videoOK = true; schedule(); });
+    video.addEventListener('error', () => { videoOK = false; video.remove(); schedule(); });
+    video.addEventListener('seeked', () => { if (videoPending !== null) { const t = videoPending; videoPending = null; seekVideo(t); } });
+  }
+  function seekVideo(t) {
+    if (!videoOK) return;
+    if (video.seeking) { videoPending = t; return; }
+    if (Math.abs(video.currentTime - t) > 0.02) video.currentTime = t;
+  }
+  // Renvoie l'opacité de la vidéo pour ce temps fort (1 = vidéo, 0 = images 3D).
+  function videoState(st) {
+    if (!video || !videoOK) return { o: 0 };
+    if (st.seg.video) { const [a, b] = st.seg.video; return { o: 1, t: a + (b - a) * st.local }; }
+    if (st.seg.id === iv.fadeOutBeat && st.local < iv.fadePortion) return { o: 1 - st.local / iv.fadePortion, t: iv.duration };
+    return { o: 0 };
+  }
+
   const store = new FrameStore({
     urlFor, count: manifest.count,
     maxBitmaps: innerWidth < 720 ? 60 : 110,
@@ -193,8 +220,15 @@ async function initFlight() {
     target = st.frame;
     if (target !== lastFrame) dir = target > lastFrame ? 1 : -1;
     lastFrame = target;
-    store.request(target, dir);
-    draw();
+    const vs = videoState(st);
+    videoOpacity = vs.o;
+    if (video) {
+      video.style.opacity = vs.o.toFixed(3);
+      if (vs.o > 0) seekVideo(Math.min(vs.t, iv.duration - 0.05));
+      if (vs.o > 0 && !poster.classList.contains('is-hidden')) poster.classList.add('is-hidden');
+    }
+    // Sous une vidéo opaque, on ne précharge les images 3D qu'à l'approche du fondu.
+    if (vs.o < 1 || st.seg.id === 'kitchen-door') { store.request(target, dir); draw(); }
     let best = 0, bestO = -1;
     els.forEach((el, i) => {
       const o = chapterOpacity(ranges[i], st.vh);
@@ -206,9 +240,10 @@ async function initFlight() {
     });
     flight.dataset.alignShade = chapters[best].align;
     dots.forEach((d, i) => d.setAttribute('aria-current', String(i === best && bestO > 0.02)));
-    window.__flight = { frame: target, drawn, vh: st.vh, beat: st.seg.id, chapter: bestO > 0.02 ? chapters[best].id : null };
+    window.__flight = { frame: target, drawn: vs.o >= 1 ? target : drawn, vh: st.vh, beat: st.seg.id, chapter: bestO > 0.02 ? chapters[best].id : null, video: videoOK ? { opacity: vs.o, time: vs.t ?? null, current: video.currentTime } : null };
   }
   const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { update(); }); };
+  video?.addEventListener('seeked', schedule);
 
   // La scène mesure 100svh : la barre d'adresse mobile ne change pas sa hauteur,
   // on ne recalcule que si la taille de la scène change réellement.
@@ -220,5 +255,5 @@ async function initFlight() {
   addEventListener('scroll', schedule, { passive: true });
   size();
   update();
-  window.__timeline = { totalVh: timeline.totalVh, segs: timeline.segs.map(({ id, start, end, from, to }) => ({ id, start, end, from, to })), fps: manifest.fps, count: manifest.count };
+  window.__timeline = { totalVh: timeline.totalVh, segs: timeline.segs.map(({ id, start, end, from, to, video }) => ({ id, start, end, from, to, video })), fps: manifest.fps, count: manifest.count };
 }

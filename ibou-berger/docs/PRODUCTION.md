@@ -10,6 +10,29 @@ Statut : **site complet, vol en rendu 3D stylisé**. Le client ne peut pas achet
 - Le rendu est déterministe : deux passages produisent les mêmes images.
 - Performance : environ 2 s par image en rendu logiciel (SwiftShader), donc environ 30 min pour 901 images.
 
+## Entrée filmée (Higgsfield, offre gratuite)
+
+Seedance 1.5 fonctionne avec l'offre gratuite, pour environ 0,3 crédit par seconde en 480p sans son. Trois clips ont été enchaînés en utilisant les images fixes validées comme images clés communes : l'image de fin d'un clip est l'image de départ du suivant.
+
+| Clip | Job | Durée | Départ → arrivée |
+|---|---|---|---|
+| 1 | `d641769f-069c-4215-a52d-e54ca7aff1fb` | 8 s | façade A (`6c863d73`) → salle (`fa40b84e`) |
+| 2 | `607e092b-9af7-4eb9-aea6-0bef6743bd58` | 8 s | salle → comptoir (`117c07a2`) |
+| 3 | `4b786212-e2f3-4dfb-9a87-9160152b290c` | 4 s | comptoir → cuisine (`110bc9d4`), passage de la porte battante |
+| Essai | `f991ee78-9608-4bcf-b36e-eea8dad70e5f` | 4 s | façade B animée (non utilisée dans le site) |
+
+**Inspection** (ffmpeg, bac à sable Higgsfield) : aucune coupe détectée (seuil 0,3), variation maximale entre deux images 0,05. Jonctions : SSIM 0,89 (1→2) et 0,88 (2→3), adoucies par un fondu de 0,125 s.
+
+**Master** : 19,9 s, 960×540, 24 i/s, H.264, une image clé toutes les 4 images pour un défilement réactif, 6,1 Mo. Il est hébergé sur Higgsfield (`media.introVideo.url` dans `src/content.js`).
+
+**Intégration** : les temps forts `hero-hold` → `kitchen-door` font défiler la vidéo, avec l'intervalle `video: [début, fin]` de chaque temps fort. Au début de `kitchen`, un fondu de 30 % bascule vers le rendu 3D. Si la vidéo ne charge pas (erreur réseau, codec), le rendu 3D couvre tout le vol.
+
+**Vérifié** : dans Chromium, avec une copie WebM de test servie à la place du MP4 (le Chromium de test ne lit pas le H.264), la vidéo suit le défilement à 0,08 s près sur ordinateur et téléphone, et le fondu se déclenche en cuisine. Le repli sans vidéo a aussi été vérifié. **Non vérifié** : la lecture du vrai MP4 hébergé, que l'environnement de travail ne peut pas atteindre.
+
+**Limites** : 480p agrandi en 960×540, donc plus doux que le reste du site. Le passage de la vidéo au rendu 3D en cuisine change de style, un changement assumé et adouci par le fondu.
+
+**Crédits** : 10,00 → 1,00. Images : 1,80. Vidéos : 1,20 + 2,40 + 2,40 + 1,20 = 7,20.
+
 ## Direction choisie
 
 - **Lieu (hypothèse à confirmer)** : restaurant gastronomique de cuisine de braise à Dakar, en bord de Corniche. Bâtiment de plain-pied en pierre volcanique sombre, lames d'iroko, grandes portes pivotantes en bois, jardin arrière avec baobab.
@@ -90,7 +113,7 @@ Projet : « Ibou Berger — Site cinématique » (`28840a8e-5b36-4252-b298-432d2
 
 **Sélection validée par le client (30/09/2026)** : façade de départ **A — basalte & bois** (`6c863d73…`), qui sera l'image de départ exacte du clip A ; intérieurs salle (`fa40b84e…`), cave (`403b1cf7…`) et braise (`110bc9d4…`) ; logo **houlette & flamme** (`13424d73…`), sur lequel repose le SVG de `brand/`. Les façades B et C restent des pistes écartées. Ce choix garde la même matière (basalte et iroko) du départ à la révélation.
 
-**Crédits** : 10,00 au départ, 8,20 restants. 1,80 crédit utilisé pour 12 images à 0,15 crédit. Aucune vidéo générée.
+**Crédits images** : 1,80 crédit pour 12 images à 0,15 crédit. Pour les vidéos, voir « Entrée filmée ».
 
 ## Blocages observés
 

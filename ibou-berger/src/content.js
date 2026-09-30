@@ -27,6 +27,16 @@ export const site = {
 // Higgsfield (même format de manifeste) sans toucher au code.
 export const media = {
   manifest: '/flight/manifest.json',
+  // Entrée filmée : 3 clips Higgsfield Seedance 1.5 enchaînés (façade → salle → comptoir → cuisine),
+  // assemblés en un master de 19,9 s encodé pour le défilement (image clé toutes les 4 images).
+  // Les temps forts qui ont une clé `video` l'utilisent ; sinon (ou si la vidéo ne charge pas),
+  // la séquence d'images 3D prend le relais.
+  introVideo: {
+    url: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3K2SiYrVa3xPykNguAMiJwaAJGL/c8083fb9-ea01-4fd2-9b2d-44277fd571a4.mp4',
+    duration: 19.9,
+    fadeOutBeat: 'kitchen', // fondu vers le rendu 3D au début de ce temps fort
+    fadePortion: 0.3,
+  },
   // Images fixes générées avec Higgsfield (Z Image). Servent de plans de
   // repli (mouvement réduit / appareils limités) et d'illustrations.
   stills: {
@@ -116,12 +126,13 @@ export const chapters = [
 // Chaque temps fort associe sa propre distance de défilement (vh = hauteurs de
 // fenêtre) à un intervalle du clip (secondes). from === to : image tenue.
 // `chapter` : le texte affiché pendant ce temps fort (null = pas de texte).
+// `video` : [début, fin] en secondes dans la vidéo d'entrée (optionnel).
 export const beats = [
-  { id: 'hero-hold', vh: 70, from: 0, to: 0, chapter: 'arrivee' },
-  { id: 'arrival', vh: 120, from: 0, to: 7, chapter: 'arrivee' },
-  { id: 'dining', vh: 170, from: 7, to: 12.4, chapter: 'salle' },
-  { id: 'bar', vh: 90, from: 12.4, to: 15, chapter: 'bar' },
-  { id: 'kitchen-door', vh: 55, from: 15, to: 16.5, chapter: null },
+  { id: 'hero-hold', vh: 70, from: 0, to: 0, video: [0, 0], chapter: 'arrivee' },
+  { id: 'arrival', vh: 120, from: 0, to: 7, video: [0, 7.4], chapter: 'arrivee' },
+  { id: 'dining', vh: 170, from: 7, to: 12.4, video: [7.4, 13.5], chapter: 'salle' },
+  { id: 'bar', vh: 90, from: 12.4, to: 15, video: [13.5, 16.4], chapter: 'bar' },
+  { id: 'kitchen-door', vh: 55, from: 15, to: 16.5, video: [16.4, 19.9], chapter: null },
   { id: 'kitchen', vh: 190, from: 16.5, to: 23, chapter: 'braise' },
   { id: 'cellar', vh: 140, from: 23, to: 30, chapter: 'cave' },
   { id: 'exit', vh: 60, from: 30, to: 33, chapter: null },

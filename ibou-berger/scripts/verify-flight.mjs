@@ -6,6 +6,23 @@ import fs from 'node:fs/promises';
 
 const BASE = process.env.BASE || 'http://localhost:4173/';
 const OUT = process.env.OUT || 'verify-shots';
+// TEST_VIDEO=chemin.webm : sert ce fichier à la place de la vidéo d'entrée (le Chromium de test ne lit pas le H.264).
+// Sans TEST_VIDEO, la vidéo est bloquée pour vérifier le repli sur les images.
+const TEST_VIDEO = process.env.TEST_VIDEO;
+const videoBytes = TEST_VIDEO ? await fs.readFile(TEST_VIDEO) : null;
+async function routeVideo(page) {
+  await page.route(/\.mp4(\?.*)?$/, async (route) => {
+    if (!videoBytes) return route.abort();
+    const range = route.request().headers().range;
+    const total = videoBytes.length;
+    if (range) {
+      const [a, b] = range.replace('bytes=', '').split('-').map((n) => (n ? Number(n) : null));
+      const start = a ?? 0, end = b ?? total - 1;
+      return route.fulfill({ status: 206, headers: { 'Content-Type': 'video/webm', 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${total}`, 'Content-Length': String(end - start + 1) }, body: videoBytes.subarray(start, end + 1) });
+    }
+    return route.fulfill({ status: 200, headers: { 'Content-Type': 'video/webm', 'Accept-Ranges': 'bytes' }, body: videoBytes });
+  });
+}
 await fs.mkdir(OUT, { recursive: true });
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 let failures = 0;
@@ -15,8 +32,13 @@ for (const vp of [{ name: 'desktop', width: 1440, height: 900 }, { name: 'phone'
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.isMobile, hasTouch: vp.hasTouch, deviceScaleFactor: vp.deviceScaleFactor || 1 });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => check(false, `[${vp.name}] erreur JS : ${e.message}`));
+  await routeVideo(page);
   await page.goto(BASE + '?mode=motion', { waitUntil: 'load' });
   await page.waitForFunction(() => window.__timeline && window.__flight);
+  if (videoBytes) await page.waitForFunction(() => window.__flight.video !== null || false, null, { timeout: 15000 }).catch(() => {});
+  const hasVideo = await page.evaluate(() => !!window.__flight.video || !!document.querySelector('.flight__video'));
+  console.log(`[${vp.name}] vidéo d'entrée : ${videoBytes ? (hasVideo ? 'chargée' : 'NON chargée') : 'bloquée (test du repli)'}`);
+  if (videoBytes) check(hasVideo, `[${vp.name}] la vidéo d'entrée se charge`);
   const tl = await page.evaluate(() => window.__timeline);
   const vh = await page.evaluate(() => document.querySelector('.flight__stage').clientHeight);
   const flightTop = await page.evaluate(() => document.getElementById('vol').offsetTop);
@@ -32,11 +54,20 @@ for (const vp of [{ name: 'desktop', width: 1440, height: 900 }, { name: 'phone'
     for (const [label, at] of [['début', 0.02], ['milieu', 0.5], ['fin', 0.98]]) {
       const posVh = s.start + (s.end - s.start) * at;
       await page.evaluate((y) => window.scrollTo(0, y), flightTop + (posVh / 100) * vh);
-      await page.waitForFunction((v) => window.__flight && Math.abs(window.__flight.vh - v) < 0.6 && window.__flight.drawn === window.__flight.frame, posVh, { timeout: 8000 }).catch(() => {});
-      const st = await page.evaluate(() => window.__flight);
-      const expected = Math.round((s.from + (s.to - s.from) * at) * tl.fps);
-      check(st.beat === s.id && Math.abs(st.frame - expected) <= 1 && st.drawn === st.frame,
-        `[${vp.name}] ${s.id} ${label} : image ${st.frame} (attendu ${expected}), dessinée ${st.drawn}, chapitre ${st.chapter}`);
+      const useVideo = !!(videoBytes && s.video);
+      if (useVideo) {
+        const vt = Math.min(s.video[0] + (s.video[1] - s.video[0]) * at, 19.85);
+        await page.waitForFunction(([v, t]) => window.__flight && Math.abs(window.__flight.vh - v) < 0.6 && window.__flight.video && Math.abs(window.__flight.video.current - t) < 0.08, [posVh, vt], { timeout: 8000 }).catch(() => {});
+        const st = await page.evaluate(() => window.__flight);
+        check(st.beat === s.id && st.video && st.video.opacity === 1 && Math.abs(st.video.current - vt) < 0.08,
+          `[${vp.name}] ${s.id} ${label} : vidéo à ${st.video?.current?.toFixed(2)} s (attendu ${vt.toFixed(2)}), opacité ${st.video?.opacity}, chapitre ${st.chapter}`);
+      } else {
+        await page.waitForFunction((v) => window.__flight && Math.abs(window.__flight.vh - v) < 0.6 && window.__flight.drawn === window.__flight.frame, posVh, { timeout: 8000 }).catch(() => {});
+        const st = await page.evaluate(() => window.__flight);
+        const expected = Math.round((s.from + (s.to - s.from) * at) * tl.fps);
+        check(st.beat === s.id && Math.abs(st.frame - expected) <= 1 && st.drawn === st.frame && (!st.video || st.video.opacity < 1),
+          `[${vp.name}] ${s.id} ${label} : image ${st.frame} (attendu ${expected}), dessinée ${st.drawn}, vidéo ${st.video ? st.video.opacity.toFixed(2) : '—'}, chapitre ${st.chapter}`);
+      }
       if (label === 'milieu') await page.screenshot({ path: `${OUT}/${vp.name}-${String(n++).padStart(2, '0')}-${s.id}.png` });
     }
   }
