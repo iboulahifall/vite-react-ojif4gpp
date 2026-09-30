@@ -80,7 +80,7 @@ Projet : « Ibou Berger — Site cinématique » (`28840a8e-5b36-4252-b298-432d2
 | Logo — sceau | `9ffe02e9-8565-4b56-b3ca-f410b58ead0e` | Sceau circulaire, spirale de corne de bélier |
 | Logo — italique | `a7e7d120-be3a-435f-9fc5-e349c4477ecd` | Mot-symbole italique, flamme sur le « i » |
 
-Choix du départ A : même matière (basalte et iroko) que les plans intérieurs et la référence aérienne, ce qui garantit une architecture cohérente du début à la fin. **Ce choix n'a pas été vérifié à l'œil** : le CDN Higgsfield est bloqué dans l'environnement de travail, donc les images n'ont pas pu être inspectées. À valider dans la galerie Higgsfield.
+**Sélection validée par le client (30/09/2026)** : façade de départ **A — basalte & bois** (`6c863d73…`), qui sera l'image de départ exacte du clip A ; intérieurs salle (`fa40b84e…`), cave (`403b1cf7…`) et braise (`110bc9d4…`) ; logo **houlette & flamme** (`13424d73…`), sur lequel repose le SVG de `brand/`. Les façades B et C restent des pistes écartées. Ce choix garde la même matière (basalte et iroko) du départ à la révélation.
 
 **Crédits** : 10,00 au départ, 8,20 restants. 1,80 crédit utilisé pour 12 images à 0,15 crédit. Aucune vidéo générée.
 
