@@ -48,11 +48,11 @@ $('#reserver').innerHTML = `<div class="wrap resa">
   </form></div>`;
 
 $('#infos').innerHTML = `<div class="wrap">
-  <div class="section__head"><div><p class="kicker">Infos pratiques</p><h2 class="h2" id="infos-title">Nous <em>trouver</em>.</h2></div><p>Informations à confirmer par le restaurant avant la mise en ligne.</p></div>
+  <div class="section__head"><div><p class="kicker">Infos pratiques</p><h2 class="h2" id="infos-title">Nous <em>trouver</em>.</h2></div><p>À Rufisque, du lundi au samedi.</p></div>
   <div class="infos">
     <div><h3>Adresse</h3><p>${esc(info.address)}</p>${info.mapsUrl ? `<p style="margin-top:1rem"><a class="link" href="${esc(info.mapsUrl)}">Itinéraire</a></p>` : ''}</div>
     <div><h3>Horaires</h3><dl>${info.hours.map(([d, h]) => `<dt>${esc(d)}</dt><dd>${esc(h)}</dd>`).join('')}</dl></div>
-    <div><h3>Contact</h3><p>${esc(info.phone)}<br />${esc(info.email)}</p><p style="margin-top:1.5rem"><a class="btn btn--primary" href="#reserver">Réserver</a></p></div>
+    <div><h3>Contact</h3>${info.phone || info.email ? `<p>${[info.phone && `<a class="link" href="tel:${esc(info.phone.replace(/\s/g, ''))}">${esc(info.phone)}</a>`, info.email && `<a class="link" href="mailto:${esc(info.email)}">${esc(info.email)}</a>`].filter(Boolean).join('<br />')}</p>` : '<p>Téléphone et email bientôt disponibles.</p>'}<p style="margin-top:1.5rem"><a class="btn btn--primary" href="#reserver">Réserver</a></p></div>
   </div></div>`;
 
 $('#footer').innerHTML = `<span>© ${new Date().getFullYear()} ${esc(site.name)} — ${esc(site.tagline)}</span>

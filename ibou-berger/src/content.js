@@ -1,7 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  IBOU BERGER — contenu éditable du site
 //  Tout le texte, les appels à l'action, la timeline du vol et les médias sont ici.
-//  Les éléments entre [crochets] sont des emplacements à remplacer par les vraies
+//  Carte et textes : proposition à valider par le restaurant. Téléphone et email
+//  restent vides (null) tant que les vrais ne sont pas fournis ; rien n'est inventé sur ces points.
+//  (Ancienne consigne :) les éléments entre [crochets] sont des emplacements à remplacer par les vraies
 //  informations du restaurant : rien n'a été inventé (adresse, horaires, prix, avis).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -10,8 +12,8 @@ const hf = (id) => `${HF}${id}_min.webp`;
 
 export const site = {
   name: 'Ibou Berger',
-  tagline: 'Cuisine de braise — Dakar',
-  demo: true, // affiche le bandeau « maquette » tant que les infos réelles ne sont pas saisies
+  tagline: 'Cuisine de braise — Rufisque',
+  demo: false, // true = affiche la mention « maquette » dans le pied de page
   nav: [
     { label: 'La visite', href: '#vol' },
     { label: 'La carte', href: '#carte' },
@@ -57,7 +59,7 @@ export const chapters = [
   {
     id: 'arrivee',
     kicker: '01 — Arrivée',
-    title: 'Le feu, la mer, Dakar.',
+    title: 'Le feu, la mer, Rufisque.',
     body: 'Une table de braise au bord de l’Atlantique. Produits du terroir sénégalais, cuisson au bois, service du soir.',
     ctas: [
       { label: 'Réserver une table', href: '#reserver', primary: true },
@@ -71,7 +73,7 @@ export const chapters = [
     id: 'salle',
     kicker: '02 — La salle',
     title: 'Une salle pensée comme une soirée.',
-    body: 'Pierre sombre, bois d’iroko, lumière basse et baies ouvertes sur l’océan. [Nombre de couverts à confirmer].',
+    body: 'Pierre sombre, bois d’iroko, lumière basse et grandes baies ouvertes sur l’océan. Une salle pour les dîners à deux comme pour les grandes tablées.',
     ctas: [{ label: 'Voir la carte', href: '#carte' }],
     still: 'salle',
     frame: 200, // image de la séquence utilisée en repli
@@ -81,7 +83,7 @@ export const chapters = [
     id: 'bar',
     kicker: '03 — Le comptoir',
     title: 'Bissap, gingembre, grands crus.',
-    body: 'Un comptoir en laiton pour l’apéritif ou le dernier verre. Carte des boissons [à fournir].',
+    body: 'Un comptoir en laiton pour l’apéritif ou le dernier verre : bissap, gingembre et bouye pressés maison, cocktails sans alcool et vins au verre.',
     ctas: [],
     still: 'bar',
     frame: 270, // image de la séquence utilisée en repli
@@ -101,7 +103,7 @@ export const chapters = [
     id: 'cave',
     kicker: '05 — La cave',
     title: 'Une cave à traverser.',
-    body: 'Vins choisis pour la braise et jus maison. Sélection [à compléter par le sommelier].',
+    body: 'Des vins choisis pour accompagner la braise, et des jus pressés chaque jour.',
     ctas: [],
     still: 'cave',
     frame: 500, // image de la séquence utilisée en repli
@@ -111,7 +113,7 @@ export const chapters = [
     id: 'revelation',
     kicker: '06 — Ibou Berger',
     title: 'On vous garde une table.',
-    body: 'HLM Rufisque · 9 h – 23 h · [Téléphone à confirmer]',
+    body: 'HLM Rufisque · Du lundi au samedi, de 9 h à 23 h',
     ctas: [
       { label: 'Réserver', href: '#reserver', primary: true },
       { label: 'Itinéraire', href: '#infos' },
@@ -143,27 +145,31 @@ export const beats = [
 
 // ── Carte (exemple de structure — plats et prix à remplacer) ────────────────
 export const menu = {
-  note: 'Exemple de structure de carte. Les plats et les prix réels sont à fournir.',
+  note: 'Carte proposée, à valider par le chef : plats et prix peuvent être modifiés dans src/content.js.',
   sections: [
     {
       title: 'Pour commencer',
       items: [
-        { name: '[Entrée signature]', desc: 'Légumes grillés à la braise, condiment [à préciser]', price: '[—] FCFA' },
-        { name: '[Entrée de la mer]', desc: 'Poisson du jour, agrumes, piment doux', price: '[—] FCFA' },
+        { name: 'Pastels de thiof', desc: 'Chaussons croustillants au poisson, sauce tomate pimentée', price: '6 500 FCFA' },
+        { name: 'Salade de mangue verte', desc: 'Crevettes grillées à la braise, arachide torréfiée, citron vert', price: '8 000 FCFA' },
+        { name: 'Brochettes au yassa', desc: 'Cœur de bœuf mariné, oignons confits au citron', price: '7 000 FCFA' },
       ],
     },
     {
       title: 'Au feu de bois',
       items: [
-        { name: '[Carré d’agneau]', desc: 'Cuit lentement sur la grille, jus au [à préciser]', price: '[—] FCFA' },
-        { name: '[Poisson entier]', desc: 'Braisé, beurre de citron vert', price: '[—] FCFA' },
+        { name: 'Carré d’agneau braisé', desc: 'Jus réduit au bissap, fonio aux herbes', price: '22 000 FCFA' },
+        { name: 'Thiof entier grillé', desc: 'Beurre de citron vert et piment doux, légumes de la braise', price: '18 000 FCFA' },
+        { name: 'Poulet fermier yassa', desc: 'Grillé au charbon de bois, oignons et moutarde, riz parfumé', price: '14 000 FCFA' },
+        { name: 'Dibi d’agneau à partager', desc: 'Pour deux, oignons, moutarde et piment, pain du four', price: '25 000 FCFA' },
       ],
     },
     {
       title: 'Pour finir',
       items: [
-        { name: '[Dessert]', desc: 'Fruits de saison rôtis, [à préciser]', price: '[—] FCFA' },
-        { name: '[Boisson maison]', desc: 'Bissap ou gingembre pressé', price: '[—] FCFA' },
+        { name: 'Thiakry à la vanille', desc: 'Mil au lait caillé, mangue rôtie', price: '5 000 FCFA' },
+        { name: 'Ananas à la braise', desc: 'Caramel au gingembre, glace au bouye', price: '5 500 FCFA' },
+        { name: 'Jus pressés maison', desc: 'Bissap, gingembre ou bouye', price: '2 500 FCFA' },
       ],
     },
   ],
@@ -172,16 +178,17 @@ export const menu = {
 export const experience = [
   { title: 'Le dîner', text: 'Service du soir en salle, face à l’océan.', still: 'salle', frame: 190 },
   { title: 'Le comptoir', text: 'Apéritif, cocktails sans alcool et vins au verre.', still: 'bar', frame: 262 },
-  { title: 'Le jardin', text: 'Tables sous le baobab pour les soirées douces. [Disponibilité à confirmer]', still: 'jardin', frame: 640 },
+  { title: 'Le jardin', text: 'Des tables sous le baobab et les lanternes pour les soirées douces.', still: 'jardin', frame: 640 },
 ];
 
 export const info = {
   address: 'HLM Rufisque, Sénégal',
   hours: [
-    ['[Jours à confirmer]', '9 h – 23 h'],
+    ['Lundi – samedi', '9 h – 23 h'],
+    ['Dimanche', 'Fermé'],
   ],
-  phone: '[Téléphone à confirmer]',
-  email: '[Email à confirmer]',
+  phone: null, // ex. '+221 …' — la ligne s’affiche dès qu’un numéro est renseigné
+  email: null,
   mapsUrl: null, // lien Google Maps / Apple Plans à ajouter
 };
 
