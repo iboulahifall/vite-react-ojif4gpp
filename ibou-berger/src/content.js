@@ -26,7 +26,7 @@ export const site = {
 // Aujourd'hui : prévisualisation grey-box. Remplacer par la séquence du master
 // Higgsfield (même format de manifeste) sans toucher au code.
 export const media = {
-  manifest: '/flight/manifest.json',
+  manifest: 'flight/manifest.json',
   // Entrée filmée : 3 clips Higgsfield Seedance 1.5 enchaînés (façade → salle → comptoir → cuisine),
   // assemblés en un master de 19,9 s encodé pour le défilement (image clé toutes les 4 images).
   // Les temps forts qui ont une clé `video` l'utilisent ; sinon (ou si la vidéo ne charge pas),

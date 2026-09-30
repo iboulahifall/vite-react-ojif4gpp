@@ -15,7 +15,7 @@ $('#nav').innerHTML = `
 $('#nav .brand svg').setAttribute('aria-hidden', 'true');
 
 // Image Higgsfield + image de la séquence en dessous (repli si le CDN ne répond pas).
-const frameUrl = (i) => `/flight/frames/frame-${String(i).padStart(4, '0')}.webp`;
+const frameUrl = (i) => `flight/frames/frame-${String(i).padStart(4, '0')}.webp`;
 const bg = (still, frame) => `background-image:url('${media.stills[still]}'), url('${frameUrl(frame)}')`;
 
 // ── Sections de contenu ────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ $('#infos').innerHTML = `<div class="wrap">
 
 $('#footer').innerHTML = `<span>© ${new Date().getFullYear()} ${esc(site.name)} — ${esc(site.tagline)}</span>
   ${site.demo ? '<span>Maquette : les informations entre [crochets] sont à remplacer par celles du restaurant.</span>' : ''}
-  <span><a class="link" href="/style-tile.html">Planche de style</a></span>`;
+  <span><a class="link" href="style-tile.html">Planche de style</a></span>`;
 
 // ── Formulaire : jamais de faux « envoyé » ──────────────────────────────────
 $('#resa-form').addEventListener('submit', async (e) => {
