@@ -111,7 +111,7 @@ export const chapters = [
     id: 'revelation',
     kicker: '06 — Ibou Berger',
     title: 'On vous garde une table.',
-    body: '[Adresse à confirmer], Dakar · [Horaires à confirmer] · [Téléphone à confirmer]',
+    body: 'HLM Rufisque · 9 h – 23 h · [Téléphone à confirmer]',
     ctas: [
       { label: 'Réserver', href: '#reserver', primary: true },
       { label: 'Itinéraire', href: '#infos' },
@@ -176,9 +176,9 @@ export const experience = [
 ];
 
 export const info = {
-  address: '[Adresse à confirmer], Dakar, Sénégal',
+  address: 'HLM Rufisque, Sénégal',
   hours: [
-    ['[Jours]', '[Horaires à confirmer]'],
+    ['[Jours à confirmer]', '9 h – 23 h'],
   ],
   phone: '[Téléphone à confirmer]',
   email: '[Email à confirmer]',
