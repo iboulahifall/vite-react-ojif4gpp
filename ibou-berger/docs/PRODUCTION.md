@@ -1,6 +1,14 @@
 # Ibou Berger — note de production
 
-Statut : **maquette fonctionnelle**. Le site, le moteur de défilement, la planche de style et les images fixes sont faits. Le vol vidéo Higgsfield n'est pas encore généré (crédits insuffisants, voir « Blocages »). Le vol actuel est une **prévisualisation volumétrique** (grey-box Three.js) qui suit exactement la trajectoire prévue.
+Statut : **site complet, vol en rendu 3D stylisé**. Le client ne peut pas acheter de crédits Higgsfield. Le vol affiché est donc un **rendu 3D fait sur place, sans coût** (Three.js, `scripts/previz/render.js`). Il suit exactement la trajectoire prévue, avec matières procédurales, feu en particules, halos lumineux, grain et vignettage. La vidéo Higgsfield reste une amélioration possible plus tard : les consignes et le pipeline ci-dessous sont prêts.
+
+## Rendu 3D du vol
+
+- Scène : `scripts/previz/render.js`. Trajectoire commune : `scripts/previz/route.js`. L'ancienne maquette grise reste disponible avec `--scene greybox`.
+- Commande : `npm run previz -- --w 1440 --fps 20 --q 0.8`. Elle écrit `public/flight/frames/` et `public/flight/manifest.json`.
+- Réglages : lumières et matières dans `render.js` ; manœuvres (secondes, positions, lacet, tangage) dans `route.js`. Après un changement de minutage, ajuster `beats` dans `src/content.js`.
+- Le rendu est déterministe : deux passages produisent les mêmes images.
+- Performance : environ 2 s par image en rendu logiciel (SwiftShader), donc environ 30 min pour 901 images.
 
 ## Direction choisie
 
@@ -44,7 +52,7 @@ Mesuré en hauteurs d'écran (vh). Le défilement actif de 1 210 vh est compté 
 
 Modifier ce rythme revient à modifier le tableau `beats` de `src/content.js`. La distance de défilement ne dépend ni de la durée du clip ni du nombre d'images.
 
-## Consignes vidéo Higgsfield (prêtes à lancer)
+## Consignes vidéo Higgsfield (optionnel, si des crédits deviennent disponibles)
 
 Le schéma du modèle a été vérifié en direct : `seedance_2_5`, modes `omni_reference` et `video_extension` (`extension_mode: forward`), durée de 4 à 30 s, rôles `start_image` / `image_references` / `video_references`, 480p/720p/1080p. Ne jamais écrire « drone » dans les consignes.
 

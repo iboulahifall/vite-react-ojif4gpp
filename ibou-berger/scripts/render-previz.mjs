@@ -7,7 +7,9 @@ import path from 'node:path';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, v, i, arr) => (v.startsWith('--') ? [...a, [v.slice(2), arr[i + 1]]] : a), []));
 const FPS = Number(args.fps || 20);
-const W = Number(args.w || 1280);
+const W = Number(args.w || 1440);
+const SCENE = args.scene || 'render'; // 'render' (rendu stylisé) ou 'greybox'
+const QUALITY = Number(args.q || 0.8);
 const DURATION = 45;
 const OUT = path.resolve(args.out || 'public/flight/frames');
 const only = args.only ? args.only.split(',').map(Number) : null;
@@ -17,7 +19,8 @@ await server.listen();
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: W, height: Math.round(W * 9 / 16) } });
 page.on('pageerror', (e) => console.error('pageerror', e));
-await page.goto(`http://localhost:5199/index.html?w=${W}`);
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.error('console', m.text()); });
+await page.goto(`http://localhost:5199/index.html?w=${W}&scene=${SCENE}&q=${QUALITY}`);
 await page.waitForFunction(() => window.previzReady === true, null, { timeout: 60000 });
 await fs.mkdir(OUT, { recursive: true });
 
@@ -31,8 +34,10 @@ for (const i of frames) {
 }
 if (!only) {
   const manifest = {
-    source: 'previz-greybox',
-    note: 'Prévisualisation volumétrique générée localement (Three.js). À remplacer par la séquence extraite du master Higgsfield.',
+    source: SCENE === 'greybox' ? 'previz-greybox' : 'render-3d',
+    note: SCENE === 'greybox'
+      ? 'Prévisualisation volumétrique (Three.js).'
+      : 'Rendu 3D stylisé généré localement (Three.js, scripts/previz/render.js). Remplaçable par la séquence d’un master vidéo (scripts/pipeline.sh).',
     version: new Date().toISOString().slice(0, 19).replace(/[-:T]/g, ''),
     fps: FPS, count, duration: DURATION, width: W, height: Math.round(W * 9 / 16),
     pattern: 'frames/frame-{index4}.webp',

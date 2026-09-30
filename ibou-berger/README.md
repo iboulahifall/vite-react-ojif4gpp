@@ -26,7 +26,11 @@ Les valeurs `[entre crochets]` sont à remplacer par les vraies informations. Pa
 
 **Réservation** : indiquez une URL qui accepte un POST JSON (Formspree, un backend, etc.) dans `reservation.endpoint`. Le message « Demande envoyée » ne s'affiche que si le serveur répond OK.
 
-## Remplacer le vol de prévisualisation par le vol Higgsfield
+## Le vol
+
+Le vol affiché est un rendu 3D stylisé généré localement. Pour le recalculer : `npm run previz` (environ 30 min), après avoir modifié `scripts/previz/render.js` (décor, lumières) ou `scripts/previz/route.js` (trajectoire).
+
+### Option : remplacer par un vol vidéo Higgsfield
 
 1. Générez les clips A, B et C avec les consignes de `docs/PRODUCTION.md`.
 2. Lancez `scripts/pipeline.sh clipA.mp4 clipB.mp4 clipC.mp4` (ffmpeg requis). Il inspecte les clips, assemble le master, extrait les images et écrit le manifeste.
@@ -55,5 +59,5 @@ npm run check:frames                 # manifeste et fichiers
 - `src/tokens.css`, `src/styles.css` : jetons de design et styles.
 - `style-tile.html` : planche de style (logo, palette, typographie, boutons, carte, direction d'image).
 - `brand/` : logo SVG (monogramme + logo complet).
-- `scripts/previz/` et `scripts/render-previz.mjs` : prévisualisation Three.js de la trajectoire (`npm run previz`).
+- `scripts/previz/render.js` (rendu stylisé), `scene.js` (maquette grise), `route.js` (trajectoire) et `scripts/render-previz.mjs` (`npm run previz`).
 - `docs/PRODUCTION.md` : histoire visuelle, rythme, consignes Higgsfield, identifiants des jobs, crédits, limites.
