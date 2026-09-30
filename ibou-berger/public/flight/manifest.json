@@ -1,12 +1,12 @@
 {
-  "source": "previz-greybox",
-  "note": "Prévisualisation volumétrique générée localement (Three.js). À remplacer par la séquence extraite du master Higgsfield.",
-  "version": "20260930081802",
+  "source": "render-3d",
+  "note": "Rendu 3D stylisé généré localement (Three.js, scripts/previz/render.js). Remplaçable par la séquence d’un master vidéo (scripts/pipeline.sh). Recompressé en WebP qualité 70.",
+  "version": "20260930092230",
   "fps": 20,
   "count": 901,
   "duration": 45,
-  "width": 1280,
-  "height": 720,
+  "width": 1440,
+  "height": 810,
   "pattern": "frames/frame-{index4}.webp",
   "poster": "frames/frame-0000.webp"
 }
