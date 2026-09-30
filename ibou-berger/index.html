@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ibou Berger — Cuisine de braise, Rufisque</title>
+    <meta name="description" content="Ibou Berger, restaurant de cuisine de braise à Rufisque. Visitez le lieu, découvrez la carte et réservez votre table." />
+    <meta name="theme-color" content="#141110" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="preload" as="image" href="flight/frames/frame-0000.webp" />
+  </head>
+  <body>
+    <a class="skip" href="#apres-vol">Passer la visite</a>
+    <header class="nav" id="nav" data-tone="dark"></header>
+    <main id="main">
+      <section class="flight" id="vol" aria-label="Visite du restaurant en un seul plan">
+        <div class="flight__stage">
+          <img class="flight__poster" alt="" src="flight/frames/frame-0000.webp" />
+          <canvas class="flight__canvas" aria-hidden="true"></canvas>
+          <div class="flight__shade"></div>
+          <div class="flight__chapters"></div>
+          <a class="flight__skip" href="#apres-vol">Passer la visite ↓</a>
+          <ol class="flight__progress" aria-label="Chapitres de la visite"></ol>
+          <span class="flight__badge" hidden></span>
+        </div>
+        <div class="static-chapters"></div>
+      </section>
+      <div id="apres-vol" tabindex="-1"></div>
+      <section class="section section--light" id="carte" aria-labelledby="carte-title"></section>
+      <section class="section section--dark" id="experience" aria-labelledby="exp-title"></section>
+      <section class="section section--light" id="reserver" aria-labelledby="resa-title"></section>
+      <section class="section section--dark" id="infos" aria-labelledby="infos-title"></section>
+    </main>
+    <footer class="footer" id="footer"></footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

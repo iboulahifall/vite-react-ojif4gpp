@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Planche de style Ibou Berger</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      .tile { display: grid; grid-template-columns: 1.1fr 1fr; min-height: 100vh; }
+      .tile__dark { background: var(--basalt); color: var(--ivory); padding: var(--space-5) var(--gutter); display: grid; gap: var(--space-4); align-content: start; }
+      .tile__light { background: var(--paper); color: var(--ink); padding: var(--space-5) var(--gutter); display: grid; gap: var(--space-4); align-content: start; }
+      .label { font: 600 0.7rem/1 var(--font-body); letter-spacing: var(--tracking-caps); text-transform: uppercase; opacity: .6; margin: 0 0 12px; }
+      .logo-row { display: flex; align-items: center; gap: 22px; }
+      .logo-row svg { width: 46px; height: 72px; }
+      .logo-row .name { font: 500 3.2rem/1 var(--font-display); }
+      .logo-row small { display: block; font: 600 .72rem/1 var(--font-body); letter-spacing: .3em; color: var(--ember-hi); margin-top: 10px; }
+      .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+      .sw { border-radius: var(--radius); overflow: hidden; border: 1px solid rgba(128,128,128,.25); font: 500 .72rem/1.35 var(--font-body); }
+      .sw i { display: block; height: 64px; }
+      .sw span { display: block; padding: 6px 8px; }
+      .type-display { font: 500 var(--fs-display)/0.98 var(--font-display); margin: 0; }
+      .type-display em { color: var(--ember-hi); }
+      .imagery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .imagery div { aspect-ratio: 4/3; background: var(--basalt-3) center/cover; border-radius: var(--radius); }
+      .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+      .note { font-size: .85rem; color: var(--muted-light); max-width: 40em; }
+      @media (max-width: 900px) { .tile { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="tile">
+      <section class="tile__dark" aria-label="Identité sur fond basalte">
+        <div>
+          <p class="label">Logo — houlette & flamme</p>
+          <div class="logo-row" id="logo"></div>
+        </div>
+        <div>
+          <p class="label">Titre — Cormorant Garamond 500</p>
+          <p class="type-display">Le feu, la mer, <em>Rufisque</em>.</p>
+        </div>
+        <div>
+          <p class="label">Texte — Manrope 400 / 600</p>
+          <p style="max-width:34em;margin:0;color:#e6dccb">Une table de braise au bord de l’Atlantique. Produits du terroir sénégalais, cuisson au bois, service du soir.</p>
+        </div>
+        <div>
+          <p class="label">Actions</p>
+          <div class="row"><a class="btn btn--primary" href="#">Réserver une table</a><a class="btn btn--ghost" href="#">Voir la carte</a><a class="link" href="#">Lien texte</a></div>
+        </div>
+        <div>
+          <p class="label">Direction d’image — crépuscule, braise, pierre sombre (Higgsfield)</p>
+          <div class="imagery" id="imagery"></div>
+        </div>
+      </section>
+      <section class="tile__light" aria-label="Composants sur fond papier">
+        <div>
+          <p class="label">Palette</p>
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <div>
+          <p class="label">Titre de section</p>
+          <h2 class="h2" style="margin:0">Cuisiné <em>au feu</em>, servi à table.</h2>
+        </div>
+        <div>
+          <p class="label">Carte / composant de service</p>
+          <article class="card" style="max-width:360px;color:var(--ivory)">
+            <div class="card__media" id="card-media"></div>
+            <div class="card__body"><h3>Le comptoir</h3><p>Apéritif, cocktails sans alcool et vins au verre.</p></div>
+          </article>
+        </div>
+        <div>
+          <p class="label">Ligne de carte</p>
+          <div class="menu__item" style="max-width:420px"><strong>[Carré d’agneau]</strong><em>[—] FCFA</em><span>Cuit lentement sur la grille</span></div>
+        </div>
+        <div>
+          <p class="label">Champ de formulaire</p>
+          <div class="field" style="max-width:320px"><label for="demo-f">Date</label><input id="demo-f" type="date" /></div>
+        </div>
+        <p class="note">Principes : fond basalte pour l’immersion, sections papier pour la lecture. Une seule couleur d’action (braise). Titres en capitales d’imprimerie élégantes, jamais plus de deux graisses par écran. Mouvement lent, fondus de 0,3 s, aucune animation qui bloque la lecture.</p>
+      </section>
+    </div>
+    <script type="module">
+      import './src/styles.css';
+      import mark from './brand/mark.svg?raw';
+      import { media } from './src/content.js';
+      document.getElementById('logo').innerHTML = `${mark}<div><span class="name">Ibou Berger</span><small>CUISINE DE BRAISE — RUFISQUE</small></div>`;
+      const colors = [['Basalte', '--basalt'], ['Basalte 2', '--basalt-2'], ['Basalte 3', '--basalt-3'], ['Ivoire', '--ivory'], ['Papier', '--paper'], ['Sable', '--sand'], ['Braise', '--ember'], ['Braise vive', '--ember-hi'], ['Braise encre', '--ember-ink'], ['Laiton', '--brass'], ['Océan', '--ocean'], ['Encre', '--ink']];
+      const cs = getComputedStyle(document.documentElement);
+      document.getElementById('swatches').innerHTML = colors.map(([n, v]) => `<div class="sw"><i style="background:var(${v})"></i><span>${n}<br>${cs.getPropertyValue(v).trim()}</span></div>`).join('');
+      document.getElementById('imagery').innerHTML = [['arrivee', 0], ['braise', 390], ['cave', 500]].map(([k, f]) => `<div style="background-image:url('${media.stills[k]}'), url('flight/frames/frame-${String(f).padStart(4, '0')}.webp')"></div>`).join('');
+      document.getElementById('card-media').style.backgroundImage = `url('${media.stills.bar}'), url('flight/frames/frame-0262.webp')`;
+    </script>
+  </body>
+</html>

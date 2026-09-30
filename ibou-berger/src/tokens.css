@@ -1,0 +1,36 @@
+/* Jetons de design Ibou Berger — partagés par le site et la planche de style. */
+:root {
+  /* Matières */
+  --basalt: #141110;      /* pierre volcanique — fond principal */
+  --basalt-2: #1d1815;
+  --basalt-3: #2a231f;
+  --ivory: #efe6d8;       /* texte sur fond sombre */
+  --paper: #f4ede2;       /* sections claires */
+  --paper-2: #e9dfcf;
+  --ink: #1b1613;         /* texte sur fond clair */
+  --sand: #cdbfa8;
+  --muted-dark: #a89a86;  /* texte secondaire sur sombre */
+  --muted-light: #6b5f52; /* texte secondaire sur clair */
+  --ember: #c8663a;       /* braise — action principale */
+  --ember-hi: #e08a4f;
+  --ember-ink: #9c4a24;   /* braise lisible sur papier */
+  --brass: #b8955a;
+  --ocean: #23404f;
+
+  /* Typographie */
+  --font-display: 'Cormorant Garamond', 'Iowan Old Style', 'Times New Roman', serif;
+  --font-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --fs-display: clamp(2.6rem, 1.4rem + 5.2vw, 6rem);
+  --fs-h2: clamp(2rem, 1.3rem + 2.8vw, 3.6rem);
+  --fs-h3: clamp(1.35rem, 1.1rem + 0.8vw, 1.75rem);
+  --fs-body: clamp(1rem, 0.96rem + 0.2vw, 1.1rem);
+  --fs-small: 0.82rem;
+  --tracking-caps: 0.22em;
+
+  /* Espacement & formes */
+  --gutter: clamp(16px, 4vw, 56px);
+  --space-1: 0.5rem; --space-2: 1rem; --space-3: 1.5rem; --space-4: 2.5rem; --space-5: 4rem; --space-6: 7rem;
+  --radius: 2px;
+  --line: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
